@@ -1,0 +1,9 @@
+.git
+__pycache__
+*.py[cod]
+out/*.mp4
+out/*.png
+!out/.gitkeep
+server.log
+nohup.out
+.DS_Store

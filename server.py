@@ -23,7 +23,7 @@ from engine import render_still_image, render_video, OUT_DIR, AUDIO_DIR
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
-PORT = 8089
+PORT = int(os.environ.get("PORT", 8089))
 
 DB_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DB_DIR, exist_ok=True)
@@ -82,7 +82,42 @@ def auto_wrap_text(text, max_chars=36):
         wrapped_paras.append("\n".join(lines))
     return "\n".join(wrapped_paras)
 
-TELEGRAM_SCRIPT = "/data/data/com.termux/files/home/send_telegram.sh"
+TELEGRAM_SCRIPT = os.environ.get("TELEGRAM_SCRIPT", "/data/data/com.termux/files/home/send_telegram.sh")
+DEFAULT_BOT_TOKEN = "8821651076:AAFUjZGp8JCAQV0ZCE1yiV0W4fJvhioiNmU"
+DEFAULT_CHAT_ID = "1227103966"
+
+def send_telegram_media(target_file, caption):
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN)
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID)
+
+    if os.path.exists(TELEGRAM_SCRIPT):
+        if target_file.endswith(".mp4"):
+            cmd = [TELEGRAM_SCRIPT, "video", target_file, caption]
+        elif target_file.endswith((".png", ".jpg", ".jpeg")):
+            cmd = [TELEGRAM_SCRIPT, "photo", target_file, caption]
+        else:
+            cmd = [TELEGRAM_SCRIPT, "doc", target_file, caption]
+        return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    if target_file.endswith(".mp4"):
+        endpoint = "sendVideo"
+        field = "video"
+    elif target_file.endswith((".png", ".jpg", ".jpeg")):
+        endpoint = "sendPhoto"
+        field = "photo"
+    else:
+        endpoint = "sendDocument"
+        field = "document"
+
+    cmd = [
+        "curl", "-s", "-X", "POST",
+        f"https://api.telegram.org/bot{bot_token}/{endpoint}",
+        "-F", f"chat_id={chat_id}",
+        "-F", f"{field}=@{target_file}",
+        "-F", f"caption={caption}",
+        "-F", "parse_mode=HTML"
+    ]
+    return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 PRESETS = [
     {
@@ -607,15 +642,8 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 if not os.path.exists(target_file):
                     raise FileNotFoundError(f"File {file_rel} not found on disk")
 
-                # Send via ~/send_telegram.sh
-                if target_file.endswith(".mp4"):
-                    cmd = [TELEGRAM_SCRIPT, "video", target_file, caption]
-                elif target_file.endswith((".png", ".jpg", ".jpeg")):
-                    cmd = [TELEGRAM_SCRIPT, "photo", target_file, caption]
-                else:
-                    cmd = [TELEGRAM_SCRIPT, "doc", target_file, caption]
-
-                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                # Send via send_telegram_media helper
+                res = send_telegram_media(target_file, caption)
                 resp = {
                     "status": "success" if res.returncode == 0 else "error",
                     "output": res.stdout.strip(),
@@ -649,5 +677,5 @@ def run_server(port=PORT):
         httpd.shutdown()
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else PORT
+    port = int(os.environ.get("PORT", sys.argv[1] if len(sys.argv) > 1 else PORT))
     run_server(port)
