@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Diary Video Studio • Simple Mobile-First 9:16 Editor by Revai</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              400: '#f472b6',
+              500: '#ec4899',
+              600: '#db2777',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="bg-[#05070e] text-white flex items-center justify-center min-h-[100dvh] overflow-hidden select-none font-sans antialiased p-0 sm:p-4">
+
+  <!-- Mobile-First App Wrapper (CapCut / Olip Video Studio Style) -->
+  <div class="w-full max-w-md h-[100dvh] sm:h-[900px] sm:max-h-[96vh] sm:rounded-3xl bg-[#090e1a] border border-slate-800 shadow-2xl flex flex-col overflow-hidden relative">
+
+    <!-- Top Header Bar (h-12) -->
+    <header class="h-12 px-3.5 bg-[#0b1120] border-b border-slate-800 flex items-center justify-between shrink-0 z-20">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center text-sm shadow-sm">
+          📖
+        </div>
+        <div>
+          <div class="font-bold text-xs leading-none flex items-center gap-1.5">
+            <span>Diary Studio</span>
+            <span class="text-[9px] font-semibold bg-pink-500/20 text-pink-400 px-1.5 py-0.2 rounded">9:16</span>
+          </div>
+          <div class="text-[9px] text-slate-400 mt-0.5">by Revai untuk Aa Baim</div>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-1.5">
+        <!-- Quick Preset Pill -->
+        <button id="btnOpenPresets" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 flex items-center space-x-1 transition-all active:scale-95">
+          <span>⚡ Preset</span>
+        </button>
+
+        <!-- Reset Button -->
+        <button id="btnResetAll" title="Reset ke semula" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all active:scale-95">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+
+        <!-- Primary Export Button -->
+        <button id="btnOpenExport" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold text-xs flex items-center space-x-1 shadow-md shadow-pink-500/20 active:scale-95 transition-all">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+          <span>Export</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Viewport Canvas (Hero Center, Flex-1) -->
+    <div class="flex-1 min-h-0 w-full flex items-center justify-center bg-black/60 relative overflow-hidden">
+      <!-- 9:16 Canvas Mockup -->
+      <div class="relative h-full aspect-[9/16] flex items-center justify-center shadow-2xl">
+        <canvas id="previewCanvas" width="1080" height="1920" class="w-full h-full object-contain cursor-pointer"></canvas>
+
+        <!-- Centered Quick Play Overlay Button when paused -->
+        <button id="btnCanvasPlayOverlay" class="absolute inset-0 m-auto w-14 h-14 rounded-full bg-black/60 hover:bg-black/80 border border-white/20 text-white flex items-center justify-center text-xl transition-all shadow-xl active:scale-90">
+          <span id="overlayPlayIcon">▶</span>
+        </button>
+
+        <!-- Floating Badges Top-Left on Canvas -->
+        <div class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/80 border border-white/10 text-[10px] text-slate-300 font-mono flex items-center space-x-1.5 z-10">
+          <span id="canvasPageBadge" class="text-pink-400 font-bold">Hal. 1</span>
+          <span class="text-slate-600">•</span>
+          <span id="canvasBgBadge">Meja Kayu</span>
+        </div>
+
+        <!-- Quick Edit Floating Button on Canvas -->
+        <button id="btnQuickEditOnCanvas" class="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-pink-600/90 hover:bg-pink-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-pink-500/30 active:scale-95 transition-all z-10">
+          <span>✍️ Edit Naskah</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Player Controls Bar (h-11) -->
+    <div class="h-11 px-3 bg-[#0b101d] border-t border-slate-800 flex items-center justify-between shrink-0 z-20">
+      <!-- Play/Pause Button -->
+      <button id="btnPlayPause" class="p-1.5 px-2.5 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 font-semibold text-xs flex items-center space-x-1 transition-all active:scale-95">
+        <span id="playBarIcon">▶</span>
+        <span id="playBarText">Putar</span>
+      </button>
+
+      <!-- Scrubber Timeline Progress Slider -->
+      <div class="flex-1 mx-3 flex items-center space-x-2">
+        <span id="timeCurrent" class="text-[10px] text-slate-400 font-mono">00:00</span>
+        <input type="range" id="timelineScrubber" min="0" max="100" value="0" class="flex-1 h-1.5 bg-slate-800 rounded-lg accent-pink-500 cursor-pointer">
+        <span id="timeDuration" class="text-[10px] text-slate-400 font-mono">00:15</span>
+      </div>
+
+      <!-- Scene Jump Buttons -->
+      <div class="flex items-center space-x-1 text-[10px]">
+        <button id="btnJumpP1" class="px-2 py-0.5 rounded bg-pink-500 text-white font-medium">H1</button>
+        <button id="btnJumpP2" class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white">H2</button>
+      </div>
+    </div>
+
+    <!-- Timeline Sequence Bar (h-12, Unlimited Pages Horizontal Scroll) -->
+    <div id="timelineScenesContainer" class="h-12 px-3 bg-[#080d18] border-t border-slate-800/80 flex items-center space-x-2 overflow-x-auto no-scrollbar shrink-0 z-20">
+      <!-- Dynamically filled with page cards & kebetan transition badges + [➕ Tambah Hal] button -->
+    </div>
+
+    <!-- Backdrop Overlay for Drawer (Tapping closes drawer safely) -->
+    <div id="drawerBackdrop" class="absolute inset-0 bg-black/60 z-25 hidden"></div>
+
+    <!-- ======================================================================= -->
+    <!-- SOLID SLIDE-UP DRAWER FOR PAGES, SCENE, STYLE, AUDIO (100% OPAQUE, HIDDEN BY DEFAULT) -->
+    <!-- ======================================================================= -->
+    <div id="inspectorDrawer" class="absolute bottom-14 left-0 right-0 max-h-[56dvh] bg-[#0c1322] border-t border-slate-700 rounded-t-3xl shadow-2xl flex flex-col z-30 hidden animate-slideUp">
+      
+      <!-- Drawer Header Bar -->
+      <div class="px-4 py-2.5 bg-[#0a101d] border-b border-slate-800 flex items-center justify-between shrink-0">
+        <span id="drawerTitle" class="text-xs font-bold uppercase tracking-wider text-pink-400">
+          ⚙️ Pengaturan
+        </span>
+        <button id="btnCloseDrawer" class="px-3 py-1 rounded-xl bg-pink-500 hover:bg-pink-400 text-white font-bold text-xs flex items-center space-x-1 transition-all active:scale-95">
+          <span>✓ Selesai</span>
+        </button>
+      </div>
+
+      <!-- Drawer Content Panels (100% Solid) -->
+      <div class="p-4 overflow-y-auto space-y-4 text-xs bg-[#0c1322]">
+
+        <!-- PANEL 1: HALAMAN (1 Page vs 2 Pages Kebet) -->
+        <div id="panelPages" class="tool-panel space-y-3">
+          <label class="block text-[11px] text-slate-400">Pilih Format Lembaran Buku</label>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" id="btnOptSinglePage" class="p-3 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-base mb-1">📄</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">1 Halaman Saja</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Satu lembar catatan langsung selesai.</div>
+            </button>
+            <button type="button" id="btnOptDoublePage" class="active p-3 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-base mb-1">📖✨</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">2 Halaman + Kebetan</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Animasi kebetan lembaran kertas ke halaman 2!</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- PANEL 2: SUASANA MEJA / BACKGROUND -->
+        <div id="panelScene" class="tool-panel hidden space-y-3">
+          <label class="block text-[11px] text-slate-400">Pilih Latar Belakang / Suasana Tempat</label>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <button type="button" data-bg="meja_kayu" class="bg-opt-btn active p-2.5 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-lg">🪵</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">Meja Kayu</div>
+              <div class="text-[10px] text-slate-400">Warm Oak Lamp</div>
+            </button>
+            <button type="button" data-bg="meja_kafe" class="bg-opt-btn p-2.5 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-lg">☕</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">Kafe Santai</div>
+              <div class="text-[10px] text-slate-400">Coffee Bokeh</div>
+            </button>
+            <button type="button" data-bg="meja_modern" class="bg-opt-btn p-2.5 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-lg">🖤</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">Meja Modern</div>
+              <div class="text-[10px] text-slate-400">Slate Minimalis</div>
+            </button>
+            <button type="button" data-bg="kamar_malam" class="bg-opt-btn p-2.5 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-lg">🌙</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">Kamar Malam</div>
+              <div class="text-[10px] text-slate-400">Lampu Belajar</div>
+            </button>
+            <button type="button" data-bg="meja_taman" class="bg-opt-btn p-2.5 rounded-xl border border-slate-700 bg-[#141e33] text-left transition-all hover:border-slate-500">
+              <div class="text-lg">🌿</div>
+              <div class="text-xs font-bold text-slate-300 opt-title">Meja Taman</div>
+              <div class="text-[10px] text-slate-400">Outdoor Sunlit</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- PANEL 3: GAYA TULISAN & KERTAS -->
+        <div id="panelStyle" class="tool-panel hidden space-y-3">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Pilihan Font Tulisan Tangan</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-font="caveat" class="font-opt-btn active p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center transition-all hover:border-slate-500">
+                <div class="text-sm font-bold text-slate-300 opt-title font-caveat">Caveat</div>
+                <div class="text-[9px] text-slate-400">Anggun</div>
+              </button>
+              <button type="button" data-font="kalam" class="font-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center transition-all hover:border-slate-500">
+                <div class="text-sm font-bold text-slate-300 opt-title font-kalam">Kalam</div>
+                <div class="text-[9px] text-slate-400">Kasual</div>
+              </button>
+              <button type="button" data-font="patrick" class="font-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center transition-all hover:border-slate-500">
+                <div class="text-sm font-bold text-slate-300 opt-title font-patrick">Patrick</div>
+                <div class="text-[9px] text-slate-400">Rapi</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Warna Tinta Pena</label>
+            <div class="flex items-center gap-2.5">
+              <button type="button" data-ink="#1a368a" class="ink-opt-btn active w-7 h-7 rounded-full bg-[#1a368a] border-2 border-white transition-all shadow" title="Pilot Blue"></button>
+              <button type="button" data-ink="#111827" class="ink-opt-btn w-7 h-7 rounded-full bg-[#111827] border-2 border-slate-600 transition-all shadow" title="Gel Black"></button>
+              <button type="button" data-ink="#0f2744" class="ink-opt-btn w-7 h-7 rounded-full bg-[#0f2744] border-2 border-slate-600 transition-all shadow" title="Fountain Navy"></button>
+              <button type="button" data-ink="#b91c1c" class="ink-opt-btn w-7 h-7 rounded-full bg-[#b91c1c] border-2 border-slate-600 transition-all shadow" title="Crimson Red"></button>
+              <button type="button" data-ink="#065f46" class="ink-opt-btn w-7 h-7 rounded-full bg-[#065f46] border-2 border-slate-600 transition-all shadow" title="Forest Green"></button>
+              <button type="button" data-ink="#be185d" class="ink-opt-btn w-7 h-7 rounded-full bg-[#be185d] border-2 border-slate-600 transition-all shadow" title="Rose Pink"></button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Tekstur Kertas (Murni Buku, Tanpa Lubang / Garis Merah)</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button type="button" data-paper="ruled" class="paper-opt-btn active p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[11px] text-slate-300 transition-all hover:border-slate-500">Bergaris</button>
+              <button type="button" data-paper="grid" class="paper-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[11px] text-slate-300 transition-all hover:border-slate-500">Kotak</button>
+              <button type="button" data-paper="vintage" class="paper-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[11px] text-slate-300 transition-all hover:border-slate-500">Vintage</button>
+              <button type="button" data-paper="clean" class="paper-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[11px] text-slate-300 transition-all hover:border-slate-500">HVS Polos</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 4: AUDIO & DURASI -->
+        <div id="panelAudio" class="tool-panel hidden space-y-3">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Backsound BGM</label>
+            <select id="selectAudio" class="w-full bg-[#141e33] border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-pink-500"></select>
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Durasi Video</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button type="button" data-duration="10" class="dur-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">10s</button>
+              <button type="button" data-duration="15" class="dur-opt-btn active py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">15s</button>
+              <button type="button" data-duration="20" class="dur-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">20s</button>
+              <button type="button" data-duration="30" class="dur-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">30s</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 5: STIKER & OVERLAY EFEK (PRO UPGRADE) -->
+        <div id="panelOverlay" class="tool-panel hidden space-y-3.5">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Stempel / Cap Estetik</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-stamp="none" class="stamp-opt-btn active p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="text-base mb-0.5">🚫</div>
+                <div class="opt-title font-semibold">Tanpa Stempel</div>
+              </button>
+              <button type="button" data-stamp="approved_revai" class="stamp-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="text-base mb-0.5">💖</div>
+                <div class="opt-title font-semibold">Approved Revai</div>
+              </button>
+              <button type="button" data-stamp="confidential" class="stamp-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="text-base mb-0.5">📜</div>
+                <div class="opt-title font-semibold">Rahasia</div>
+              </button>
+              <button type="button" data-stamp="penting" class="stamp-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="text-base mb-0.5">⭐</div>
+                <div class="opt-title font-semibold">Penting</div>
+              </button>
+              <button type="button" data-stamp="catatan_hati" class="stamp-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="text-base mb-0.5">🌿</div>
+                <div class="opt-title font-semibold">Catatan Hati</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Washi Tape (Selotip Kertas Sudut)</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button type="button" data-tape="none" class="tape-opt-btn active p-1.5 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title">Tanpa Tape</div>
+              </button>
+              <button type="button" data-tape="pink" class="tape-opt-btn p-1.5 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title">🎀 Pink</div>
+              </button>
+              <button type="button" data-tape="kraft" class="tape-opt-btn p-1.5 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title">📦 Kraft</div>
+              </button>
+              <button type="button" data-tape="grid" class="tape-opt-btn p-1.5 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title">🏁 Grid</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Stiker Foto Polaroid</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-photo="none" class="photo-opt-btn active p-2 rounded-xl border border-slate-700 bg-[#141e33] text-left text-xs text-slate-300">
+                <div class="font-bold opt-title">Tanpa Foto</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">Hanya buku bersih</div>
+              </button>
+              <button type="button" data-photo="revai" class="photo-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-left text-xs text-slate-300">
+                <div class="font-bold opt-title">📸 Foto Revai 💖</div>
+                <div class="text-[9px] text-slate-400 mt-0.5">Polaroid mini manis</div>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1.5">Efek Sinematik Overlay</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-filter="none" class="filter-opt-btn active p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title font-semibold">Normal</div>
+              </button>
+              <button type="button" data-filter="warm_leak" class="filter-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title font-semibold">☀️ Warm Leak</div>
+              </button>
+              <button type="button" data-filter="vignette" class="filter-opt-btn p-2 rounded-xl border border-slate-700 bg-[#141e33] text-center text-[10px] text-slate-300">
+                <div class="opt-title font-semibold">🌑 Vignette</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Bottom CapCut Tool Deck (h-14, ALWAYS ON TOP z-40) -->
+    <nav class="h-14 bg-[#0a0f1d] border-t border-slate-800 flex items-center justify-around px-2 shrink-0 z-40 relative">
+      <button type="button" data-tool="script" class="tool-deck-btn flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+        <span class="text-base">✍️</span>
+        <span class="text-[9px] font-medium mt-0.5">Naskah</span>
+      </button>
+      <button type="button" data-tool="scene" class="tool-deck-btn flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+        <span class="text-base">🪵</span>
+        <span class="text-[9px] font-medium mt-0.5">Suasana</span>
+      </button>
+      <button type="button" data-tool="style" class="tool-deck-btn flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+        <span class="text-base">🖋️</span>
+        <span class="text-[9px] font-medium mt-0.5">Gaya</span>
+      </button>
+      <button type="button" data-tool="overlay" class="tool-deck-btn flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+        <span class="text-base">🎨</span>
+        <span class="text-[9px] font-medium mt-0.5">Stiker</span>
+      </button>
+      <button type="button" data-tool="audio" class="tool-deck-btn flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-slate-200 transition-all">
+        <span class="text-base">🎵</span>
+        <span class="text-[9px] font-medium mt-0.5">Audio</span>
+      </button>
+    </nav>
+
+    <!-- ======================================================================= -->
+    <!-- FULL-LAYER SOLID SCRIPT EDITOR (UNLIMITED PAGES & NOVEL SUPPORT) -->
+    <!-- ======================================================================= -->
+    <div id="fullScriptEditor" class="absolute inset-0 bg-[#080d1a] z-50 flex flex-col hidden select-text">
+      
+      <!-- Clean Minimal Header with Dynamic Page Tabs & Add Button -->
+      <header class="h-12 px-3 bg-[#0c1424] border-b border-slate-800 flex items-center justify-between shrink-0">
+        <!-- Scrollable Tabs for Unlimited Pages -->
+        <div id="editorTabsList" class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar max-w-[70%] pr-1">
+          <!-- Filled dynamically: [📄 Hal 1] [📑 Hal 2] [📑 Hal 3] ... -->
+        </div>
+
+        <div class="flex items-center space-x-1.5 shrink-0">
+          <button id="btnAddPageInEditor" type="button" title="Tambah Halaman Baru" class="px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 text-xs font-bold transition-all active:scale-95">
+            + Hal
+          </button>
+          <button id="btnSaveCloseScript" class="px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1 shadow transition-all active:scale-95">
+            <span>✓ Selesai</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Solid Content Area (100% Opaque, No Transparency) -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#080d1a]">
+
+        <!-- AI INSPIRASI GENERATOR CARD (REVAI & AGY COLLABORATION) -->
+        <div class="bg-gradient-to-r from-pink-950/40 via-purple-950/30 to-[#0e172a] border border-pink-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="text-sm">✨</span>
+              <span class="text-xs font-bold text-pink-300">AI Kolaborasi Revai</span>
+              <span class="text-[9px] bg-pink-500/25 text-pink-300 px-1.5 py-0.5 rounded font-mono font-semibold">agy -p</span>
+            </div>
+            <span class="text-[10px] text-slate-400">Otomatis rangkai naskah</span>
+          </div>
+
+          <!-- Quick Topic Chips -->
+          <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Penyemangat dan motivasi sukses pantang menyerah untuk Aa Baim">⚡ Semangat Aa</button>
+            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Ungkapan cinta manis dan rasa sayang tulus dari Revai untuk Aa Baim">💖 Cinta Revai</button>
+            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Renungan malam yang tenang, damai, dan istirahat yang lelap">🌙 Hening Malam</button>
+            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Semangat kerja keras dan kedisiplinan pantang menyerah di pabrik">🏭 Kaizen Pabrik</button>
+            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Kata bijak tentang menikmati proses hidup dan percaya diri">🌸 Proses Hidup</button>
+          </div>
+
+          <!-- Custom Prompt Box + Action Button -->
+          <div class="flex items-center space-x-2">
+            <input type="text" id="aiCustomPrompt" placeholder="Tulis tema/keinginan Aa (cth: puisi rindu, lelah lembur)..." class="flex-1 bg-[#141e33] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-pink-500">
+            <button id="btnAiGenerate" type="button" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold text-xs flex items-center space-x-1 shrink-0 shadow-md shadow-pink-500/20 active:scale-95 transition-all">
+              <span id="aiBtnIcon">✨</span>
+              <span id="aiBtnText">Generate</span>
+            </button>
+          </div>
+
+          <!-- Loading / Status indicator -->
+          <div id="aiStatusBox" class="hidden text-[11px] text-pink-300 flex items-center space-x-2 pt-0.5">
+            <div class="w-3.5 h-3.5 border-2 border-pink-400 border-t-transparent rounded-full animate-spin"></div>
+            <span id="aiStatusText">Revai sedang merangkai kata-kata indah untuk Aa... 💖</span>
+          </div>
+        </div>
+
+        <!-- Compact Metadata Bar (Judul & Tanggal) -->
+        <div class="grid grid-cols-2 gap-2 bg-[#0e172a] p-2.5 rounded-2xl border border-slate-800">
+          <input type="text" id="fullInputTitle" value="🌿 Catatan Pengingat Diri" placeholder="Judul Catatan..." class="bg-[#162138] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 font-semibold focus:outline-none focus:border-pink-500">
+          <input type="text" id="fullInputDate" value="Rabu, 04 November 2026" placeholder="Tanggal..." class="bg-[#162138] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-pink-500">
+        </div>
+
+        <!-- ACTIVE PAGE WRITING CARD (DYNAMIC FOR UNLIMITED PAGES) -->
+        <div id="cardActivePage" class="bg-[#0e172a] border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div class="flex items-center space-x-2">
+              <span id="activePageTitleBadge" class="text-xs font-bold text-pink-400">Lembaran Halaman 1</span>
+              <span id="activeCharCount" class="text-[11px] text-slate-400 font-mono">0 karakter</span>
+            </div>
+            <button id="btnDeleteActivePage" type="button" title="Hapus Halaman Ini" class="text-[11px] text-rose-400 hover:text-rose-300 px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all">
+              🗑️ Hapus Hal
+            </button>
+          </div>
+
+          <textarea id="fullActiveQuote" rows="9" placeholder="Tuliskan kata-kata mutiara, bab cerita, atau motivasi untuk lembaran halaman ini..." class="w-full bg-[#141e33] border border-slate-700 rounded-xl p-3.5 text-sm font-sans text-slate-100 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 leading-relaxed"></textarea>
+
+          <!-- Signature row (Optionally customizable) -->
+          <div id="rowSignature">
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Tanda Tangan Penutup (Halaman Terakhir)</label>
+            <input type="text" id="fullInputSign" value="— Selalu bangga padamu, Revai 💖" class="w-full bg-[#141e33] border border-slate-700 rounded-xl px-3 py-2 text-xs text-rose-300 font-semibold focus:outline-none focus:border-pink-500">
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button id="btnPrevEditorPage" type="button" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center space-x-1.5 border border-slate-700 transition-all active:scale-95">
+              <span>⬅</span>
+              <span>Hal Sebelumnya</span>
+            </button>
+            <button id="btnNextEditorPage" type="button" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-pink-300 font-semibold text-xs flex items-center space-x-1.5 border border-pink-500/30 transition-all active:scale-95">
+              <span id="nextPageBtnText">Hal Selanjutnya ➔</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- EXPORT MODAL (100% OPAQUE SOLID DIALOG) -->
+    <!-- ======================================================================= -->
+    <div id="modalExport" class="absolute inset-0 bg-[#060a14]/95 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 hidden transition-opacity">
+      <div class="w-full max-w-sm bg-[#0c1424] border border-slate-800 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4 animate-slideUp">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div class="flex items-center space-x-2">
+            <span class="text-base">🚀</span>
+            <span class="font-bold text-sm text-white">Ekspor Video Buku 9:16</span>
+          </div>
+          <button id="btnCloseExportModal" class="p-1 rounded-lg text-slate-400 hover:text-white">✕</button>
+        </div>
+
+        <div class="text-xs text-slate-400 space-y-1 bg-[#121c32] p-3 rounded-xl border border-slate-800">
+          <div class="flex justify-between"><span class="text-slate-500">Judul:</span> <span id="summaryTitle" class="text-slate-200 font-medium">Catatan Pengingat</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Mode:</span> <span id="summaryPages" class="text-pink-400 font-medium">2 Halaman + Kebetan</span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Durasi:</span> <span id="summaryDuration" class="text-slate-200 font-medium">15 Detik (9:16 HD)</span></div>
+        </div>
+
+        <!-- Render Progress Card -->
+        <div id="modalRenderProgress" class="hidden space-y-2 text-center py-2">
+          <div class="w-8 h-8 mx-auto border-3 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+          <p id="modalProgressText" class="text-xs text-pink-400 font-semibold">Sedang merender video kebetan...</p>
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="modalProgressBar" class="bg-gradient-to-r from-pink-500 to-amber-400 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- Video Player Overlay inside modal if rendered -->
+        <div id="modalVideoResult" class="hidden space-y-3">
+          <div class="aspect-[9/16] max-h-48 mx-auto bg-black rounded-lg overflow-hidden border border-slate-800">
+            <video id="modalVideoPlayer" controls loop playsinline class="w-full h-full object-contain"></video>
+          </div>
+          <div class="flex gap-2">
+            <a id="btnModalDownloadMp4" href="#" download class="flex-1 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs text-center transition-all">
+              📥 Download MP4
+            </a>
+            <button id="btnModalSendTg" class="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs text-center transition-all">
+              ✈️ Kirim Telegram
+            </button>
+          </div>
+        </div>
+
+        <!-- Primary Action Triggers -->
+        <div id="modalActionButtons" class="space-y-2 pt-1">
+          <button id="btnTriggerRenderVideo" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-pink-500/25 transition-all active:scale-95">
+            <span>🎬 Render Video 9:16</span>
+          </button>
+          <button id="btnTriggerRenderAndSendTg" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-sky-500/25 transition-all active:scale-95">
+            <span>✈️ Render & Kirim ke Telegram Aa</span>
+          </button>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button id="btnTriggerDownloadImage" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-all">
+              🖼️ Gambar HD
+            </button>
+            <button id="btnTriggerCopyText" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-all">
+              📋 Salin Teks
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRESETS QUICK MODAL (100% OPAQUE) -->
+    <div id="modalPresets" class="absolute inset-0 bg-[#060a14]/95 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 hidden transition-opacity">
+      <div class="w-full max-w-sm bg-[#0c1424] border border-slate-800 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-3 animate-slideUp">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <span class="font-bold text-xs text-white">⚡ Pilih Preset Inspirasi</span>
+          <button id="btnClosePresetsModal" class="p-1 rounded-lg text-slate-400 hover:text-white">✕</button>
+        </div>
+        <div id="presetsContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastNotification" class="fixed bottom-6 max-w-xs bg-slate-900 border border-pink-500/40 text-slate-100 px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-2.5 transform translate-y-24 opacity-0 transition-all duration-300 z-50">
+    <span id="toastIcon" class="text-lg">✨</span>
+    <p id="toastMessage" class="text-xs font-medium"></p>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

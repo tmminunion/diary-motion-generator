@@ -1,0 +1,15 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary and render outputs
+out/*.mp4
+out/*.png
+!out/.gitkeep
+server.log
+nohup.out
+
+# OS files
+.DS_Store
+Thumbs.db

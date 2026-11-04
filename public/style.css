@@ -1,0 +1,138 @@
+/* Custom Styles and Web Fonts for Diary Video Studio */
+
+@font-face {
+  font-family: 'Caveat';
+  src: url('/fonts/Caveat-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Kalam';
+  src: url('/fonts/Kalam-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Patrick Hand';
+  src: url('/fonts/PatrickHand-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-caveat {
+  font-family: 'Caveat', cursive, sans-serif;
+}
+
+.font-kalam {
+  font-family: 'Kalam', cursive, sans-serif;
+}
+
+.font-patrick {
+  font-family: 'Patrick Hand', cursive, sans-serif;
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar for Drawer & Editor */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Tool Deck Button States */
+.tool-deck-btn {
+  color: #94a3b8;
+  transition: all 0.15s ease;
+}
+.tool-deck-btn:hover {
+  color: #e2e8f0;
+}
+.tool-deck-btn.active {
+  color: #f472b6 !important;
+  background-color: rgba(236, 72, 153, 0.18) !important;
+  transform: translateY(-2px);
+}
+
+/* Timeline Card States */
+.timeline-scene-card.active {
+  border-color: rgba(236, 72, 153, 0.8) !important;
+  background-color: rgba(236, 72, 153, 0.2) !important;
+  box-shadow: 0 0 10px rgba(236, 72, 153, 0.25);
+}
+
+/* Strict Drawer Closed - CANNOT BLOCK CLICKS */
+#inspectorDrawer.drawer-closed,
+#inspectorDrawer.hidden {
+  display: none !important;
+}
+
+/* Base and Active Options */
+.bg-opt-btn, .font-opt-btn, .paper-opt-btn, .dur-opt-btn, .stamp-opt-btn, .tape-opt-btn, .photo-opt-btn, .filter-opt-btn, #btnOptSinglePage, #btnOptDoublePage {
+  transition: all 0.15s ease;
+}
+.bg-opt-btn .opt-title, .font-opt-btn .opt-title, .stamp-opt-btn .opt-title, .tape-opt-btn .opt-title, .photo-opt-btn .opt-title, .filter-opt-btn .opt-title, #btnOptSinglePage .opt-title, #btnOptDoublePage .opt-title {
+  color: #cbd5e1;
+  transition: color 0.15s ease;
+}
+
+.bg-opt-btn.active, .font-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, #btnOptSinglePage.active, #btnOptDoublePage.active {
+  border-color: rgba(236, 72, 153, 0.9) !important;
+  background-color: rgba(236, 72, 153, 0.22) !important;
+  color: #f472b6 !important;
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.25);
+}
+.bg-opt-btn.active .opt-title, .font-opt-btn.active .opt-title, .stamp-opt-btn.active .opt-title, .tape-opt-btn.active .opt-title, .photo-opt-btn.active .opt-title, .filter-opt-btn.active .opt-title, #btnOptSinglePage.active .opt-title, #btnOptDoublePage.active .opt-title {
+  color: #f472b6 !important;
+}
+
+.ink-opt-btn.active {
+  transform: scale(1.2);
+  border-color: #ffffff !important;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.ai-chip.active {
+  background-color: rgba(236, 72, 153, 0.25) !important;
+  border-color: rgba(236, 72, 153, 0.8) !important;
+  color: #f472b6 !important;
+}
+
+/* Toast */
+#toastNotification.show {
+  transform: translateY(0);
+  opacity: 1;
+}
