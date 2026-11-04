@@ -26,6 +26,7 @@ const state = {
   ink_color: "#1a368a",
   bg_scene: "meja_kayu",
   duration: 15,
+  pause_duration: 3.0, // Configurable reading hold time after writing finishes
   audio_file: "Menepi_di_Savannah_afacb19f.mp3",
   watermark: "📖 DIARY MOTIVATION • REVAI",
 
@@ -171,8 +172,9 @@ async function init() {
 
 function calculateAndSyncDuration() {
   const N = state.pages.length;
-  // If duration is too short for N pages, auto-adjust nicely
-  const minDur = N === 1 ? 10 : N * 6 + (N - 1) * 2;
+  const pauseDur = state.pause_duration || 3.0;
+  // Calculate minimum duration needed: writing (min 3.5s/page) + reading pause + kebetan
+  const minDur = Math.ceil(N * (3.5 + pauseDur) + (N - 1) * 1.5);
   if (!state.duration || state.duration < minDur) {
     state.duration = minDur;
   }
@@ -311,25 +313,30 @@ function buildPlaybackSchedule() {
   const N = state.pages.length;
   const duration = state.duration;
   const flipDur = 1.5;
+  const pauseDur = state.pause_duration || 3.0;
+
   const totalFlipTime = (N - 1) * flipDur;
-  const remainingTime = Math.max(N * 2.0, duration - totalFlipTime);
-  const timePerPage = remainingTime / N;
+  const totalPauseTime = N * pauseDur;
+  const availableWriteTime = Math.max(N * 3.5, duration - totalFlipTime - totalPauseTime);
+  const writeTimePerPage = availableWriteTime / N;
 
   const schedule = [];
   let curT = 0;
 
   for (let i = 0; i < N; i++) {
-    const writeDur = timePerPage * 0.78;
-    const holdDur = timePerPage - writeDur;
+    const wStart = curT;
+    const wEnd = curT + writeTimePerPage;
+    const hEnd = wEnd + pauseDur; // Exact configurable reading hold time!
     const pInfo = {
       page_idx: i,
-      write_start: curT,
-      write_end: curT + writeDur,
-      hold_end: curT + timePerPage,
+      write_start: wStart,
+      write_end: wEnd,
+      hold_end: hEnd,
+      pause_dur: pauseDur,
       flip_start: null,
       flip_end: null
     };
-    curT += timePerPage;
+    curT = hEnd;
     if (i < N - 1) {
       pInfo["flip_start"] = curT;
       pInfo["flip_end"] = curT + flipDur;
@@ -369,7 +376,20 @@ function renderTimelineScenes() {
     });
     timelineScenesContainer.appendChild(btnPage);
 
-    // 2. Kebetan Transition Badge
+    // 2. Reading Pause Badge (Jeda Baca)
+    const badgePause = document.createElement("button");
+    badgePause.type = "button";
+    badgePause.className = "flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-950/70 border border-sky-600/40 hover:border-sky-400 text-[10px] text-sky-300 shrink-0 transition-all active:scale-95";
+    badgePause.innerHTML = `<span>⏳</span><span>Baca ${state.pause_duration || 3}s</span>`;
+    badgePause.title = "Waktu jeda baca sebelum kebetan (Klik untuk atur)";
+    badgePause.addEventListener("click", () => {
+      pausePlayback();
+      seekTo(item.write_end);
+      openToolDrawer("audio");
+    });
+    timelineScenesContainer.appendChild(badgePause);
+
+    // 3. Kebetan Transition Badge
     if (item.flip_start !== null) {
       const badge = document.createElement("button");
       badge.type = "button";
@@ -808,6 +828,23 @@ function setupEventListeners() {
     });
   });
 
+  // Reading Pause (Jeda Baca) options
+  document.querySelectorAll(".pause-opt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const p = parseFloat(btn.getAttribute("data-pause"));
+      state.pause_duration = p;
+      document.querySelectorAll(".pause-opt-btn").forEach(b => b.classList.toggle("active", parseFloat(b.getAttribute("data-pause")) === p));
+      const lbl = document.getElementById("labelPauseCurrent");
+      if (lbl) lbl.textContent = `${p.toFixed(1)} detik`;
+      calculateAndSyncDuration();
+      updateScrubberDuration();
+      renderTimelineScenes();
+      showToast("⏳ Jeda Baca Diatur", `Penonton diberi waktu ${p} detik membaca sebelum kebetan.`);
+      seekTo(0);
+      renderCanvas();
+    });
+  });
+
   // Play / Pause triggers
   btnPlayPause.addEventListener("click", togglePlayback);
   btnCanvasPlayOverlay.addEventListener("click", togglePlayback);
@@ -1118,6 +1155,7 @@ function renderCanvas() {
 
   let activeItem = schedule[0];
   let isFlipping = false;
+  let isReadingPause = false;
   let flipProgress = 0;
   let flipFromIdx = 0;
   let flipToIdx = 1;
@@ -1143,6 +1181,8 @@ function renderCanvas() {
         showPen = true;
       } else {
         charsToShow = totChars;
+        showPen = false;
+        isReadingPause = true;
       }
       break;
     } else if (i === schedule.length - 1) {
@@ -1150,12 +1190,19 @@ function renderCanvas() {
       const curPage = state.pages[i];
       const lines = (curPage.quote || "").split("\n");
       charsToShow = lines.reduce((acc, l) => acc + (l.trim() ? l.length : 0), 0) || 1;
+      showPen = false;
     }
   }
 
   // Sync current page index from playback
   state.current_page_idx = activeItem.page_idx;
-  canvasPageBadge.textContent = `Hal. ${state.current_page_idx + 1} / ${N}`;
+  if (isReadingPause) {
+    canvasPageBadge.textContent = `Hal. ${state.current_page_idx + 1}/${N} • 📖 Jeda Baca`;
+  } else if (isFlipping) {
+    canvasPageBadge.textContent = `Kebetan Hal. ${flipFromIdx + 1} ➔ ${flipToIdx + 1}`;
+  } else {
+    canvasPageBadge.textContent = `Hal. ${state.current_page_idx + 1} / ${N}`;
+  }
 
   // 7. Header Title & Date
   ctx.font = getCssFont("kalam", 32);
@@ -1508,7 +1555,7 @@ function drawRoundedRect(c, x, y, width, height, radius) {
 function openExportModal() {
   summaryTitle.textContent = state.title;
   summaryPages.textContent = `${state.pages.length} Halaman (Realistic Kebetan)`;
-  summaryDuration.textContent = `${state.duration} Detik (9:16 HD 1080x1920)`;
+  summaryDuration.textContent = `${state.duration}s (Jeda Baca: ${state.pause_duration || 3}s • 9:16 HD 1080x1920)`;
 
   modalRenderProgress.classList.add("hidden");
   modalVideoResult.classList.add("hidden");
@@ -1533,6 +1580,7 @@ async function triggerVideoRender(sendTelegramAfter = false) {
     ink_color: state.ink_color,
     bg_scene: state.bg_scene,
     duration: state.duration,
+    pause_duration: state.pause_duration || 3.0,
     audio_file: state.audio_file,
     watermark: state.watermark,
     overlays: state.overlays

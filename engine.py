@@ -578,27 +578,32 @@ def render_video(config, out_filename="diary_handwriting.mp4", progress_callback
     proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     t0 = time.time()
 
-    # Timeline calculation for N pages
-    # Total flip transitions = N - 1
+    # Timeline calculation for N pages with configurable Reading Pause (Jeda Baca)
+    pause_dur = float(config.get("pause_duration", 3.0))
+    pause_frames = int(pause_dur * FPS)
     flip_frames = int(1.5 * FPS) if N > 1 else 0
     total_flip_frames = (N - 1) * flip_frames
-    remaining_frames = max(N * 30, total_frames - total_flip_frames)
-    frames_per_page = remaining_frames // N
+    total_pause_frames = N * pause_frames
+
+    available_write_frames = max(N * int(3.5 * FPS), total_frames - total_flip_frames - total_pause_frames)
+    write_frames_per_page = available_write_frames // N
 
     # Build sequence timetable
     timeline = []
     cur_f = 0
     for i in range(N):
-        write_dur = int(frames_per_page * 0.78)
+        w_start = cur_f
+        w_end = cur_f + write_frames_per_page
+        h_end = w_end + pause_frames  # Audience reading hold time!
         p_info = {
             "page_idx": i,
-            "write_start": cur_f,
-            "write_end": cur_f + write_dur,
-            "hold_end": cur_f + frames_per_page,
+            "write_start": w_start,
+            "write_end": w_end,
+            "hold_end": h_end,
             "flip_start": None,
             "flip_end": None
         }
-        cur_f += frames_per_page
+        cur_f = h_end
         if i < N - 1:
             p_info["flip_start"] = cur_f
             p_info["flip_end"] = cur_f + flip_frames

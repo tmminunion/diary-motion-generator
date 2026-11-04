@@ -101,7 +101,7 @@
 }
 
 /* Base and Active Options */
-.bg-opt-btn, .font-opt-btn, .paper-opt-btn, .dur-opt-btn, .stamp-opt-btn, .tape-opt-btn, .photo-opt-btn, .filter-opt-btn, #btnOptSinglePage, #btnOptDoublePage {
+.bg-opt-btn, .font-opt-btn, .paper-opt-btn, .dur-opt-btn, .pause-opt-btn, .stamp-opt-btn, .tape-opt-btn, .photo-opt-btn, .filter-opt-btn, #btnOptSinglePage, #btnOptDoublePage {
   transition: all 0.15s ease;
 }
 .bg-opt-btn .opt-title, .font-opt-btn .opt-title, .stamp-opt-btn .opt-title, .tape-opt-btn .opt-title, .photo-opt-btn .opt-title, .filter-opt-btn .opt-title, #btnOptSinglePage .opt-title, #btnOptDoublePage .opt-title {
@@ -109,7 +109,7 @@
   transition: color 0.15s ease;
 }
 
-.bg-opt-btn.active, .font-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, #btnOptSinglePage.active, #btnOptDoublePage.active {
+.bg-opt-btn.active, .font-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .pause-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, #btnOptSinglePage.active, #btnOptDoublePage.active {
   border-color: rgba(236, 72, 153, 0.9) !important;
   background-color: rgba(236, 72, 153, 0.22) !important;
   color: #f472b6 !important;
