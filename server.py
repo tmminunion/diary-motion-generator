@@ -85,10 +85,11 @@ def auto_wrap_text(text, max_chars=36):
 
 TELEGRAM_SCRIPT = os.environ.get("TELEGRAM_SCRIPT", "/data/data/com.termux/files/home/send_telegram.sh")
 DEFAULT_BOT_TOKEN = "8821651076:AAFUjZGp8JCAQV0ZCE1yiV0W4fJvhioiNmU"
+OLIP_BOT_TOKEN = "8787730585:AAE8ScJ8Cnc0CD3ncAIfkOb1cdSO8a4WtUw"
 DEFAULT_CHAT_ID = "1227103966"
 
-def send_telegram_media(target_file, caption, chat_id=None):
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN)
+def send_telegram_media(target_file, caption, chat_id=None, bot_token=None):
+    tokens = [bot_token] if bot_token else [DEFAULT_BOT_TOKEN, OLIP_BOT_TOKEN]
     target_chat = str(chat_id or os.environ.get("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID))
 
     if os.path.exists(TELEGRAM_SCRIPT):
@@ -98,7 +99,7 @@ def send_telegram_media(target_file, caption, chat_id=None):
             cmd = [TELEGRAM_SCRIPT, "photo", target_file, caption]
         else:
             cmd = [TELEGRAM_SCRIPT, "doc", target_file, caption]
-        return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     if target_file.endswith(".mp4"):
         endpoint = "sendVideo"
@@ -110,31 +111,39 @@ def send_telegram_media(target_file, caption, chat_id=None):
         endpoint = "sendDocument"
         field = "document"
 
-    cmd = [
-        "curl", "-4", "-s", "-X", "POST",
-        f"https://api.telegram.org/bot{bot_token}/{endpoint}",
-        "-F", f"chat_id={target_chat}",
-        "-F", f"{field}=@{target_file}",
-        "-F", f"caption={caption}",
-        "-F", "parse_mode=HTML"
-    ]
-    return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    last_res = None
+    for token in tokens:
+        cmd = [
+            "curl", "-4", "-s", "-X", "POST",
+            f"https://api.telegram.org/bot{token}/{endpoint}",
+            "-F", f"chat_id={target_chat}",
+            "-F", f"{field}=@{target_file}",
+            "-F", f"caption={caption}",
+            "-F", "parse_mode=HTML"
+        ]
+        try:
+            last_res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=35)
+            print(f"[TELEGRAM MEDIA SENT] token=...{token[-8:]} chat={target_chat} res={last_res.stdout[:60]}", flush=True)
+        except Exception as e:
+            print(f"[TELEGRAM MEDIA ERROR] {e}", flush=True)
+    return last_res
 
-def send_telegram_text(chat_id, text):
-    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN)
+def send_telegram_text(chat_id, text, bot_token=None):
+    tokens = [bot_token] if bot_token else [DEFAULT_BOT_TOKEN, OLIP_BOT_TOKEN]
     target_chat = str(chat_id or DEFAULT_CHAT_ID)
-    cmd = [
-        "curl", "-4", "-s", "-X", "POST",
-        f"https://api.telegram.org/bot{bot_token}/sendMessage",
-        "-d", f"chat_id={target_chat}",
-        "-d", f"text={text}",
-        "-d", "parse_mode=HTML"
-    ]
-    try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
-        print(f"[TELEGRAM TEXT SENT] chat={target_chat} res={res.stdout[:60]}", flush=True)
-    except Exception as e:
-        print(f"[TELEGRAM TEXT ERROR] {e}", flush=True)
+    for token in tokens:
+        cmd = [
+            "curl", "-4", "-s", "-X", "POST",
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            "-d", f"chat_id={target_chat}",
+            "-d", f"text={text}",
+            "-d", "parse_mode=HTML"
+        ]
+        try:
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+            print(f"[TELEGRAM TEXT SENT] token=...{token[-8:]} chat={target_chat} res={res.stdout[:60]}", flush=True)
+        except Exception as e:
+            print(f"[TELEGRAM TEXT ERROR] {e}", flush=True)
 
 def escape_ffmpeg_text(text=""):
     if not text:
@@ -143,7 +152,7 @@ def escape_ffmpeg_text(text=""):
     t = t.replace("\\", "\\\\").replace("'", "’").replace(":", "\\:").replace("%", "\\%").replace(";", "\\;")
     return t
 
-def process_olip_render_job(project, chat_id, job_id):
+def process_olip_render_job(project, chat_id, job_id, bot_token=None):
     try:
         timestamp = int(time.time())
         session_dir = os.path.join(OUT_DIR, f"olip_{timestamp}")
@@ -164,7 +173,7 @@ def process_olip_render_job(project, chat_id, job_id):
             f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
             f"<i>Video MP4 1080×1920 sedang dirender... Mohon tunggu sebentar ya Aa Baim!</i> ⏳💖"
         )
-        send_telegram_text(chat_id, start_msg)
+        send_telegram_text(chat_id, start_msg, bot_token=bot_token)
 
         # Resolve font
         font_p = os.path.join(BASE_DIR, "assets", "fonts", "PatrickHand-Regular.ttf")
@@ -289,7 +298,7 @@ def process_olip_render_job(project, chat_id, job_id):
             f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
             f"💖 <i>Rendered 100% otomatis di Cloud Run untuk Aa Baim sayang!</i>"
         )
-        send_telegram_media(final_mp4_path, caption, chat_id=chat_id)
+        send_telegram_media(final_mp4_path, caption, chat_id=chat_id, bot_token=bot_token)
         print(f"[OLIP RENDER] Selesai & terkirim ke Telegram: {final_mp4_name}", flush=True)
 
         # Cleanup session
@@ -304,7 +313,7 @@ def process_olip_render_job(project, chat_id, job_id):
     except Exception as e:
         print(f"[OLIP RENDER ERROR] {e}", flush=True)
         err_msg = f"❌ <b>Gagal Merender Video Olip Studio:</b> <code>{str(e)}</code>"
-        send_telegram_text(chat_id, err_msg)
+        send_telegram_text(chat_id, err_msg, bot_token=bot_token)
         raise e
 
 PRESETS = [
@@ -868,8 +877,9 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                     return
 
                 job_id = f"job_{int(time.time()*1000)}"
+                bot_token = body.get("botToken") or body.get("bot_token")
                 # Run synchronously to ensure Cloud Run maintains 100% active CPU!
-                result = process_olip_render_job(project, chat_id, job_id)
+                result = process_olip_render_job(project, chat_id, job_id, bot_token=bot_token)
 
                 resp = {
                     "success": True,
