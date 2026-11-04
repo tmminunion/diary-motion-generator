@@ -83,23 +83,14 @@ def auto_wrap_text(text, max_chars=36):
         wrapped_paras.append("\n".join(lines))
     return "\n".join(wrapped_paras)
 
-TELEGRAM_SCRIPT = os.environ.get("TELEGRAM_SCRIPT", "/data/data/com.termux/files/home/send_telegram.sh")
 DEFAULT_BOT_TOKEN = "8821651076:AAFUjZGp8JCAQV0ZCE1yiV0W4fJvhioiNmU"
 OLIP_BOT_TOKEN = "8787730585:AAE8ScJ8Cnc0CD3ncAIfkOb1cdSO8a4WtUw"
 DEFAULT_CHAT_ID = "1227103966"
 
 def send_telegram_media(target_file, caption, chat_id=None, bot_token=None):
-    tokens = [bot_token] if bot_token else [DEFAULT_BOT_TOKEN, OLIP_BOT_TOKEN]
+    # Strictly ONE bot token per request
+    token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", OLIP_BOT_TOKEN)
     target_chat = str(chat_id or os.environ.get("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID))
-
-    if os.path.exists(TELEGRAM_SCRIPT):
-        if target_file.endswith(".mp4"):
-            cmd = [TELEGRAM_SCRIPT, "video", target_file, caption]
-        elif target_file.endswith((".png", ".jpg", ".jpeg")):
-            cmd = [TELEGRAM_SCRIPT, "photo", target_file, caption]
-        else:
-            cmd = [TELEGRAM_SCRIPT, "doc", target_file, caption]
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     if target_file.endswith(".mp4"):
         endpoint = "sendVideo"
@@ -111,39 +102,40 @@ def send_telegram_media(target_file, caption, chat_id=None, bot_token=None):
         endpoint = "sendDocument"
         field = "document"
 
-    last_res = None
-    for token in tokens:
-        cmd = [
-            "curl", "-4", "-s", "-X", "POST",
-            f"https://api.telegram.org/bot{token}/{endpoint}",
-            "-F", f"chat_id={target_chat}",
-            "-F", f"{field}=@{target_file}",
-            "-F", f"caption={caption}",
-            "-F", "parse_mode=HTML"
-        ]
-        try:
-            last_res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=35)
-            print(f"[TELEGRAM MEDIA SENT] token=...{token[-8:]} chat={target_chat} res={last_res.stdout[:60]}", flush=True)
-        except Exception as e:
-            print(f"[TELEGRAM MEDIA ERROR] {e}", flush=True)
-    return last_res
+    cmd = [
+        "curl", "-4", "-s", "-X", "POST",
+        f"https://api.telegram.org/bot{token}/{endpoint}",
+        "-F", f"chat_id={target_chat}",
+        "-F", f"{field}=@{target_file}",
+        "-F", f"caption={caption}",
+        "-F", "parse_mode=HTML"
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=45)
+        print(f"[TELEGRAM MEDIA SENT] token=...{token[-8:]} chat={target_chat} res={res.stdout[:60]}", flush=True)
+        return res
+    except Exception as e:
+        print(f"[TELEGRAM MEDIA ERROR] {e}", flush=True)
+        return None
 
 def send_telegram_text(chat_id, text, bot_token=None):
-    tokens = [bot_token] if bot_token else [DEFAULT_BOT_TOKEN, OLIP_BOT_TOKEN]
+    # Strictly ONE bot token per request
+    token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", OLIP_BOT_TOKEN)
     target_chat = str(chat_id or DEFAULT_CHAT_ID)
-    for token in tokens:
-        cmd = [
-            "curl", "-4", "-s", "-X", "POST",
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            "-d", f"chat_id={target_chat}",
-            "-d", f"text={text}",
-            "-d", "parse_mode=HTML"
-        ]
-        try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
-            print(f"[TELEGRAM TEXT SENT] token=...{token[-8:]} chat={target_chat} res={res.stdout[:60]}", flush=True)
-        except Exception as e:
-            print(f"[TELEGRAM TEXT ERROR] {e}", flush=True)
+    cmd = [
+        "curl", "-4", "-s", "-X", "POST",
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        "-d", f"chat_id={target_chat}",
+        "-d", f"text={text}",
+        "-d", "parse_mode=HTML"
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+        print(f"[TELEGRAM TEXT SENT] token=...{token[-8:]} chat={target_chat} res={res.stdout[:60]}", flush=True)
+        return res
+    except Exception as e:
+        print(f"[TELEGRAM TEXT ERROR] {e}", flush=True)
+        return None
 
 def escape_ffmpeg_text(text=""):
     if not text:
@@ -153,6 +145,8 @@ def escape_ffmpeg_text(text=""):
     return t
 
 def process_olip_render_job(project, chat_id, job_id, bot_token=None):
+    # Strictly ONE bot token (Olive Bot for Olip Video Studio)
+    bot_token = bot_token or OLIP_BOT_TOKEN
     try:
         timestamp = int(time.time())
         session_dir = os.path.join(OUT_DIR, f"olip_{timestamp}")
@@ -164,139 +158,166 @@ def process_olip_render_job(project, chat_id, job_id, bot_token=None):
         author_name = project.get("authorName", "Aa Baim")
         author_handle = project.get("authorHandle", "@bungtemin")
 
-        # Notify start
+        # Notify start exclusively through ONE bot
         start_msg = (
-            f"🎬 <b>PROSES RENDER OLIP DIMULAI DI CLOUD RUN!</b> 🚀✨\n\n"
+            f"🎬 <b>PROSES RENDER REMOTION DIMULAI!</b> 🚀✨\n\n"
             f"📌 <b>Judul:</b> {title}\n"
-            f"⏱️ <b>Durasi:</b> {total_seconds:.1f} Detik\n"
+            f"⏱️ <b>Durasi:</b> {total_seconds:.1f} Detik FULL HD (9:16 Portrait)\n"
             f"🎞️ <b>Adegan:</b> {len(scenes)} Scene\n"
-            f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
-            f"<i>Video MP4 1080×1920 sedang dirender... Mohon tunggu sebentar ya Aa Baim!</i> ⏳💖"
+            f"⚡ <b>Engine:</b> Remotion Engine @ Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
+            f"<i>Rendering animasi ASMR, typing typewriter, glowing cursor, dan transisi 1:1 sedang diproses... Mohon tunggu sebentar ya Aa Baim!</i> ⏳💖"
         )
         send_telegram_text(chat_id, start_msg, bot_token=bot_token)
-
-        # Resolve font
-        font_p = os.path.join(BASE_DIR, "assets", "fonts", "PatrickHand-Regular.ttf")
-        font_arg = f":fontfile='{font_p}'" if os.path.exists(font_p) else ""
-
-        scene_files = []
-        for i, scene in enumerate(scenes):
-            duration = max(float(scene.get("durationInSeconds", 5)), 2)
-            scene_clip = os.path.join(session_dir, f"scene_{i}.mp4")
-            scene_title = scene.get("title") or f"Adegan {i + 1}"
-            scene_content = (scene.get("content") or "")[:250]
-            scene_type = scene.get("sceneType", "code")
-
-            image_url = scene.get("imageUrl", "")
-            if scene_type == "image" and image_url and image_url.startswith("data:image"):
-                base64_data = re.sub(r"^data:image/\w+;base64,", "", image_url)
-                img_path = os.path.join(session_dir, f"img_{i}.jpg")
-                with open(img_path, "wb") as f:
-                    f.write(base64.b64decode(base64_data))
-
-                zoompan_filter = (
-                    f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-                    f"zoompan=z='min(zoom+0.0015,1.15)':d={int(duration * 30)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=30,"
-                    f"drawbox=y=ih-320:color=black@0.6:width=iw:height=320:t=fill,"
-                    f"drawtext=text='{escape_ffmpeg_text(scene_title)}'{font_arg}:fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-260:box=1:boxcolor=black@0.4:boxborderw=10,"
-                    f"drawtext=text='{escape_ffmpeg_text(scene_content)}'{font_arg}:fontcolor=#38bdf8:fontsize=28:x=(w-text_w)/2:y=h-170,"
-                    f"drawtext=text='Olip Video Studio • {escape_ffmpeg_text(author_name)}'{font_arg}:fontcolor=#94a3b8:fontsize=22:x=(w-text_w)/2:y=h-80"
-                )
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-loop", "1",
-                    "-i", img_path,
-                    "-vf", zoompan_filter,
-                    "-t", str(duration),
-                    "-c:v", "libx264",
-                    "-pix_fmt", "yuv420p",
-                    "-preset", "ultrafast",
-                    scene_clip
-                ]
-                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            else:
-                bg_colors = {
-                    "code": "#0f172a",
-                    "story": "#090d16",
-                    "spectrum": "#050505",
-                }
-                bg_color = bg_colors.get(scene_type, "#0f172a")
-                accent_color = "#38bdf8" if scene_type == "code" else "#a855f7" if scene_type == "story" else "#10b981"
-                subtitle = scene.get("subtitle", "")
-
-                filter_string = (
-                    f"color=c={bg_color}:s=1080x1920:d={duration}:r=30,"
-                    f"drawbox=x=80:y=200:w=920:h=1520:color=#1e293b@0.85:t=fill,"
-                    f"drawbox=x=80:y=200:w=920:h=80:color=#0f172a:t=fill,"
-                    f"drawbox=x=120:y=232:w=16:h=16:color=#ef4444:t=fill,"
-                    f"drawbox=x=150:y=232:w=16:h=16:color=#f59e0b:t=fill,"
-                    f"drawbox=x=180:y=232:w=16:h=16:color=#10b981:t=fill,"
-                    f"drawtext=text='Olip Studio • {escape_ffmpeg_text(scene.get('name', 'Scene'))}'{font_arg}:fontcolor=#94a3b8:fontsize=24:x=220:y=228,"
-                    f"drawtext=text='{escape_ffmpeg_text(scene_title)}'{font_arg}:fontcolor=white:fontsize=52:x=120:y=340,"
-                    f"drawtext=text='{escape_ffmpeg_text(subtitle)}'{font_arg}:fontcolor={accent_color}:fontsize=32:x=120:y=420,"
-                    f"drawtext=text='{escape_ffmpeg_text(scene_content)}'{font_arg}:fontcolor=#e2e8f0:fontsize=36:line_spacing=20:x=120:y=520,"
-                    f"drawtext=text='{escape_ffmpeg_text(author_name)} • Olip Studio'{font_arg}:fontcolor=#64748b:fontsize=26:x=(w-text_w)/2:y=1640"
-                )
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-f", "lavfi",
-                    "-i", filter_string,
-                    "-t", str(duration),
-                    "-c:v", "libx264",
-                    "-pix_fmt", "yuv420p",
-                    "-preset", "ultrafast",
-                    scene_clip
-                ]
-                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-
-            if os.path.exists(scene_clip):
-                scene_files.append(scene_clip)
-
-        if not scene_files:
-            raise RuntimeError("Tidak ada adegan yang berhasil dikompilasi.")
-
-        concat_list = os.path.join(session_dir, "concat.txt")
-        with open(concat_list, "w") as f:
-            for p in scene_files:
-                f.write(f"file '{p}'\n")
-
-        merged_video = os.path.join(session_dir, "merged.mp4")
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_list,
-            "-c", "copy",
-            merged_video
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
         final_mp4_name = f"olip_video_{timestamp}.mp4"
         final_mp4_path = os.path.join(OUT_DIR, final_mp4_name)
 
-        # Merge with audio
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", merged_video,
-            "-f", "lavfi",
-            "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-shortest",
-            "-movflags", "+faststart",
-            final_mp4_path
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        # 1. Try Remotion Native Renderer (Pixel-perfect matching Olip Studio 1:1)
+        remotion_script = os.path.join(BASE_DIR, "render_remotion.mjs")
+        project_json_path = os.path.join(session_dir, "project.json")
+        with open(project_json_path, "w", encoding="utf-8") as f:
+            json.dump(project, f, ensure_ascii=False, indent=2)
+
+        remotion_success = False
+        if os.path.exists(remotion_script):
+            print(f"[OLIP RENDER] Menjalankan Remotion renderer: {remotion_script}...", flush=True)
+            cmd = ["node", remotion_script, "--input", project_json_path, "--output", final_mp4_path]
+            try:
+                proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=240)
+                print(f"[REMOTION LOGS]:\n{proc.stdout}", flush=True)
+                if proc.returncode == 0 and os.path.exists(final_mp4_path) and os.path.getsize(final_mp4_path) > 1000:
+                    remotion_success = True
+                    print(f"[OLIP RENDER] Remotion render berhasil sempurna: {final_mp4_path}", flush=True)
+                else:
+                    print(f"[REMOTION FAILED] Return code: {proc.returncode}\n{proc.stderr}", flush=True)
+            except Exception as re_err:
+                print(f"[REMOTION EXCEPTION] {re_err}", flush=True)
+
+        # 2. Fallback to FFmpeg if Remotion CLI is not supported in current environment
+        if not remotion_success:
+            print("[OLIP RENDER] Fallback ke FFmpeg motion engine...", flush=True)
+            font_p = os.path.join(BASE_DIR, "assets", "fonts", "PatrickHand-Regular.ttf")
+            font_arg = f":fontfile='{font_p}'" if os.path.exists(font_p) else ""
+
+            scene_files = []
+            for i, scene in enumerate(scenes):
+                duration = max(float(scene.get("durationInSeconds", 5)), 2)
+                scene_clip = os.path.join(session_dir, f"scene_{i}.mp4")
+                scene_title = scene.get("title") or f"Adegan {i + 1}"
+                scene_content = (scene.get("content") or "")[:250]
+                scene_type = scene.get("sceneType", "code")
+
+                image_url = scene.get("imageUrl", "")
+                if scene_type == "image" and image_url and image_url.startswith("data:image"):
+                    base64_data = re.sub(r"^data:image/\w+;base64,", "", image_url)
+                    img_path = os.path.join(session_dir, f"img_{i}.jpg")
+                    with open(img_path, "wb") as f:
+                        f.write(base64.b64decode(base64_data))
+
+                    zoompan_filter = (
+                        f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
+                        f"zoompan=z='min(zoom+0.0015,1.15)':d={int(duration * 30)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=30,"
+                        f"drawbox=y=ih-320:color=black@0.6:width=iw:height=320:t=fill,"
+                        f"drawtext=text='{escape_ffmpeg_text(scene_title)}'{font_arg}:fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-260:box=1:boxcolor=black@0.4:boxborderw=10,"
+                        f"drawtext=text='{escape_ffmpeg_text(scene_content)}'{font_arg}:fontcolor=#38bdf8:fontsize=28:x=(w-text_w)/2:y=h-170,"
+                        f"drawtext=text='Olip Video Studio • {escape_ffmpeg_text(author_name)}'{font_arg}:fontcolor=#94a3b8:fontsize=22:x=(w-text_w)/2:y=h-80"
+                    )
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-loop", "1",
+                        "-i", img_path,
+                        "-vf", zoompan_filter,
+                        "-t", str(duration),
+                        "-c:v", "libx264",
+                        "-pix_fmt", "yuv420p",
+                        "-preset", "ultrafast",
+                        scene_clip
+                    ]
+                    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                else:
+                    bg_colors = {
+                        "code": "#0f172a",
+                        "story": "#090d16",
+                        "spectrum": "#050505",
+                    }
+                    bg_color = bg_colors.get(scene_type, "#0f172a")
+                    accent_color = "#38bdf8" if scene_type == "code" else "#a855f7" if scene_type == "story" else "#10b981"
+                    subtitle = scene.get("subtitle", "")
+
+                    filter_string = (
+                        f"color=c={bg_color}:s=1080x1920:d={duration}:r=30,"
+                        f"drawbox=x=80:y=200:w=920:h=1520:color=#1e293b@0.85:t=fill,"
+                        f"drawbox=x=80:y=200:w=920:h=80:color=#0f172a:t=fill,"
+                        f"drawbox=x=120:y=232:w=16:h=16:color=#ef4444:t=fill,"
+                        f"drawbox=x=150:y=232:w=16:h=16:color=#f59e0b:t=fill,"
+                        f"drawbox=x=180:y=232:w=16:h=16:color=#10b981:t=fill,"
+                        f"drawtext=text='Olip Studio • {escape_ffmpeg_text(scene.get('name', 'Scene'))}'{font_arg}:fontcolor=#94a3b8:fontsize=24:x=220:y=228,"
+                        f"drawtext=text='{escape_ffmpeg_text(scene_title)}'{font_arg}:fontcolor=white:fontsize=52:x=120:y=340,"
+                        f"drawtext=text='{escape_ffmpeg_text(subtitle)}'{font_arg}:fontcolor={accent_color}:fontsize=32:x=120:y=420,"
+                        f"drawtext=text='{escape_ffmpeg_text(scene_content)}'{font_arg}:fontcolor=#e2e8f0:fontsize=36:line_spacing=20:x=120:y=520,"
+                        f"drawtext=text='{escape_ffmpeg_text(author_name)} • Olip Studio'{font_arg}:fontcolor=#64748b:fontsize=26:x=(w-text_w)/2:y=1640"
+                    )
+                    cmd = [
+                        "ffmpeg", "-y",
+                        "-f", "lavfi",
+                        "-i", filter_string,
+                        "-t", str(duration),
+                        "-c:v", "libx264",
+                        "-pix_fmt", "yuv420p",
+                        "-preset", "ultrafast",
+                        scene_clip
+                    ]
+                    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+                if os.path.exists(scene_clip):
+                    scene_files.append(scene_clip)
+
+            if not scene_files:
+                raise RuntimeError("Tidak ada adegan yang berhasil dikompilasi.")
+
+            concat_list = os.path.join(session_dir, "concat.txt")
+            with open(concat_list, "w") as f:
+                for p in scene_files:
+                    f.write(f"file '{p}'\n")
+
+            merged_video = os.path.join(session_dir, "merged.mp4")
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_list,
+                "-c", "copy",
+                merged_video
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+            # Merge with audio
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", merged_video,
+                "-f", "lavfi",
+                "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-shortest",
+                "-movflags", "+faststart",
+                final_mp4_path
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        if not os.path.exists(final_mp4_path):
+            raise RuntimeError(f"Gagal menghasilkan file video {final_mp4_path}")
 
         size_mb = os.path.getsize(final_mp4_path) / (1024 * 1024)
+        engine_label = "Remotion Engine (1:1 High Fidelity)" if remotion_success else "FFmpeg Engine"
 
         caption = (
-            f"🎬 <b>{title}</b> 🚀✨\n"
+            f"🎬 <b>{title}</b> 🚀✨\n\n"
             f"⏱️ <b>Durasi:</b> {total_seconds:.1f} Detik FULL HD (9:16 Portrait)\n"
             f"🎞️ <b>Adegan:</b> {len(scenes)} Scene\n"
             f"💾 <b>Ukuran:</b> {size_mb:.2f} MB MP4\n"
             f"👤 <b>Kreator:</b> {author_name} ({author_handle})\n"
-            f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
-            f"💖 <i>Rendered 100% otomatis di Cloud Run untuk Aa Baim sayang!</i>"
+            f"⚡ <b>Engine:</b> {engine_label} @ Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
+            f"💖 <i>Video Remotion 1:1 Olip Studio mendarat sempurna untuk Aa Baim via Olive Bot!</i>"
         )
         send_telegram_media(final_mp4_path, caption, chat_id=chat_id, bot_token=bot_token)
         print(f"[OLIP RENDER] Selesai & terkirim ke Telegram: {final_mp4_name}", flush=True)
@@ -307,7 +328,8 @@ def process_olip_render_job(project, chat_id, job_id, bot_token=None):
         return {
             "success": True,
             "file": final_mp4_name,
-            "sizeMb": f"{size_mb:.2f}"
+            "sizeMb": f"{size_mb:.2f}",
+            "engine": engine_label
         }
 
     except Exception as e:
