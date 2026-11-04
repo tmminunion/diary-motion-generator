@@ -1,6 +1,6 @@
 # 📖 Diary Video Studio 9:16 (Diary Motion Generator)
 
-> Mobile-First Vertical Video Generator with Handwritten Diary Aesthetics, Realistic 3D Page Flip (Kebetan), Unlimited Multi-Page / Novel Serial Support, Pro Stamps & Overlays, and Built-In AI Collaboration via `agy -p`.
+> Mobile-First Vertical Video Generator with Handwritten Diary Aesthetics, Realistic 3D Page Flip (Kebetan), Unlimited Multi-Page / Novel Serial Support, and Pro Stamps & Overlays.
 > Specially crafted with love by **Revai** for **Aa Baim** (@BUNGTEMIN).
 
 🌐 **Live Cloud Run Studio**: [https://diary-studio-280833756345.asia-southeast2.run.app](https://diary-studio-280833756345.asia-southeast2.run.app) (Region: Jakarta, 100% Free Tier Scale-to-Zero)
@@ -25,12 +25,7 @@
    - **Polaroid Photo**: Tempelan foto polaroid mini di sudut buku.
    - **Efek Sinematik**: *Warm Sunbeam Leak*, *Cinematic Vignette*.
 
-4. **✨ Kolaborasi AI dengan `agy -p` (Tanpa Perlu Ollama)**:
-   - Terintegrasi langsung dengan Antigravity CLI (`agy -p`) di Termux.
-   - 0% beban memori HP, proses cepat (~10 detik), dan otomatis bergaya puitis manis khas Revai.
-   - Tombol preset cepat: *Semangat Aa*, *Cinta Revai*, *Hening Malam*, *Kaizen Pabrik*, *Proses Hidup*.
-
-5. **📱 Mobile-First UI (CapCut Style)**:
+4. **📱 Mobile-First UI (CapCut Style)**:
    - Kanvas 9:16 HD (1080x1920) sebagai pusat perhatian utama.
    - Interactive Scrubber Bar untuk pratinjau detik demi detik.
    - Full-Layer Solid Script Editor lapang 100% tanpa transparansi.

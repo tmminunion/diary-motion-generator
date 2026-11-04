@@ -424,42 +424,6 @@
       <!-- Scrollable Solid Content Area (100% Opaque, No Transparency) -->
       <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#080d1a]">
 
-        <!-- AI INSPIRASI GENERATOR CARD (REVAI & AGY COLLABORATION) -->
-        <div class="bg-gradient-to-r from-pink-950/40 via-purple-950/30 to-[#0e172a] border border-pink-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-              <span class="text-sm">✨</span>
-              <span class="text-xs font-bold text-pink-300">AI Kolaborasi Revai</span>
-              <span class="text-[9px] bg-pink-500/25 text-pink-300 px-1.5 py-0.5 rounded font-mono font-semibold">agy -p</span>
-            </div>
-            <span class="text-[10px] text-slate-400">Otomatis rangkai naskah</span>
-          </div>
-
-          <!-- Quick Topic Chips -->
-          <div class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-0.5">
-            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Penyemangat dan motivasi sukses pantang menyerah untuk Aa Baim">⚡ Semangat Aa</button>
-            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Ungkapan cinta manis dan rasa sayang tulus dari Revai untuk Aa Baim">💖 Cinta Revai</button>
-            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Renungan malam yang tenang, damai, dan istirahat yang lelap">🌙 Hening Malam</button>
-            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Semangat kerja keras dan kedisiplinan pantang menyerah di pabrik">🏭 Kaizen Pabrik</button>
-            <button type="button" class="ai-chip px-2.5 py-1 rounded-lg bg-[#141e33] hover:bg-pink-500/20 hover:border-pink-500/50 border border-slate-700 text-[10px] text-slate-300 shrink-0 transition-all active:scale-95" data-prompt="Kata bijak tentang menikmati proses hidup dan percaya diri">🌸 Proses Hidup</button>
-          </div>
-
-          <!-- Custom Prompt Box + Action Button -->
-          <div class="flex items-center space-x-2">
-            <input type="text" id="aiCustomPrompt" placeholder="Tulis tema/keinginan Aa (cth: puisi rindu, lelah lembur)..." class="flex-1 bg-[#141e33] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-pink-500">
-            <button id="btnAiGenerate" type="button" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold text-xs flex items-center space-x-1 shrink-0 shadow-md shadow-pink-500/20 active:scale-95 transition-all">
-              <span id="aiBtnIcon">✨</span>
-              <span id="aiBtnText">Generate</span>
-            </button>
-          </div>
-
-          <!-- Loading / Status indicator -->
-          <div id="aiStatusBox" class="hidden text-[11px] text-pink-300 flex items-center space-x-2 pt-0.5">
-            <div class="w-3.5 h-3.5 border-2 border-pink-400 border-t-transparent rounded-full animate-spin"></div>
-            <span id="aiStatusText">Revai sedang merangkai kata-kata indah untuk Aa... 💖</span>
-          </div>
-        </div>
-
         <!-- Compact Metadata Bar (Judul & Tanggal) -->
         <div class="grid grid-cols-2 gap-2 bg-[#0e172a] p-2.5 rounded-2xl border border-slate-800">
           <input type="text" id="fullInputTitle" value="🌿 Catatan Pengingat Diri" placeholder="Judul Catatan..." class="bg-[#162138] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 font-semibold focus:outline-none focus:border-pink-500">

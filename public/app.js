@@ -100,14 +100,6 @@ const btnPrevEditorPage = document.getElementById("btnPrevEditorPage");
 const btnNextEditorPage = document.getElementById("btnNextEditorPage");
 const nextPageBtnText = document.getElementById("nextPageBtnText");
 
-// AI GENERATOR (Revai & agy -p Collaboration)
-const aiCustomPrompt = document.getElementById("aiCustomPrompt");
-const btnAiGenerate = document.getElementById("btnAiGenerate");
-const aiBtnIcon = document.getElementById("aiBtnIcon");
-const aiBtnText = document.getElementById("aiBtnText");
-const aiStatusBox = document.getElementById("aiStatusBox");
-const aiStatusText = document.getElementById("aiStatusText");
-
 // SOLID BOTTOM DRAWER
 const inspectorDrawer = document.getElementById("inspectorDrawer");
 const drawerBackdrop = document.getElementById("drawerBackdrop");
@@ -658,112 +650,6 @@ function saveAndCloseScriptEditor() {
 }
 
 // -----------------------------------------------------------------------------
-// AI Generator (Revai & agy -p Collaboration)
-// -----------------------------------------------------------------------------
-function wrapTextAuto(text, maxChars = 36) {
-  if (!text) return "";
-  const paras = String(text).split("\n");
-  const wrapped = [];
-  for (const p of paras) {
-    const trimmed = p.trim();
-    if (!trimmed) {
-      wrapped.push("");
-      continue;
-    }
-    const words = trimmed.split(/\s+/);
-    const lines = [];
-    let cur = [];
-    let curLen = 0;
-    for (const w of words) {
-      if (curLen + w.length + (cur.length ? 1 : 0) > maxChars) {
-        if (cur.length) {
-          lines.push(cur.join(" "));
-          cur = [w];
-          curLen = w.length;
-        } else {
-          lines.push(w);
-          cur = [];
-          curLen = 0;
-        }
-      } else {
-        cur.push(w);
-        curLen += w.length + (cur.length > 1 ? 1 : 0);
-      }
-    }
-    if (cur.length) lines.push(cur.join(" "));
-    wrapped.push(lines.join("\n"));
-  }
-  return wrapped.join("\n");
-}
-
-let isGeneratingAi = false;
-async function handleAiGenerate(promptOverride = null) {
-  if (isGeneratingAi) return;
-  const prompt = (promptOverride || (aiCustomPrompt ? aiCustomPrompt.value : "")).trim();
-  if (!prompt) {
-    showToast("⚠️ Tuliskan Tema", "Ketik ide atau pilih topik preset dulu ya Aa.");
-    if (aiCustomPrompt) aiCustomPrompt.focus();
-    return;
-  }
-
-  isGeneratingAi = true;
-  if (btnAiGenerate) btnAiGenerate.disabled = true;
-  if (aiBtnIcon) aiBtnIcon.innerHTML = `<span class="inline-block animate-spin">⏳</span>`;
-  if (aiBtnText) aiBtnText.textContent = "Merangkai...";
-  if (aiStatusBox) {
-    aiStatusBox.classList.remove("hidden");
-    if (aiStatusText) aiStatusText.textContent = `Revai sedang merangkai kata manis untuk Hal ${state.current_page_idx + 1}... 💖`;
-  }
-
-  try {
-    const res = await fetch("/api/ai-generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-    const result = await res.json();
-    if (result.status === "success" && result.data) {
-      const d = result.data;
-      const targetIdx = Math.max(0, Math.min(state.current_page_idx, state.pages.length - 1));
-
-      // Choose text from AI: quote, page1, or raw prompt
-      const rawText = d.quote || d.page1 || prompt;
-      const wrappedText = wrapTextAuto(rawText, 36);
-
-      // Inject specifically into the active page! Never overwrite or reset other pages!
-      state.pages[targetIdx].quote = wrappedText;
-      if (d.sign && targetIdx === state.pages.length - 1) {
-        state.pages[targetIdx].sign = d.sign;
-      }
-      if (d.title && (state.title.includes("Pengingat Diri") || state.title.trim() === "")) {
-        state.title = d.title;
-        if (fullInputTitle) fullInputTitle.value = d.title;
-      }
-
-      fullActiveQuote.value = wrappedText;
-      activeCharCount.textContent = `${wrappedText.length} kar`;
-
-      calculateAndSyncDuration();
-      renderTimelineScenes();
-      syncEditorState();
-      renderCanvas();
-      showToast("✨ Naskah Tercipta!", `Inspirasi berhasil dirangkai untuk Halaman ${targetIdx + 1}! 💖`);
-    } else {
-      showToast("⚠️ Perhatian", result.message || "Gagal membuat naskah.");
-    }
-  } catch (err) {
-    console.error("AI Generate Error:", err);
-    showToast("⚠️ Koneksi", "Gagal menghubungi AI generator.");
-  } finally {
-    isGeneratingAi = false;
-    if (btnAiGenerate) btnAiGenerate.disabled = false;
-    if (aiBtnIcon) aiBtnIcon.textContent = "✨";
-    if (aiBtnText) aiBtnText.textContent = "Generate";
-    if (aiStatusBox) aiStatusBox.classList.add("hidden");
-  }
-}
-
-// -----------------------------------------------------------------------------
 // Drawer Management & Tools
 // -----------------------------------------------------------------------------
 function openToolDrawer(tool) {
@@ -872,23 +758,6 @@ function setupEventListeners() {
     } else {
       addNewPage();
     }
-  });
-
-  // AI Controls
-  if (btnAiGenerate) btnAiGenerate.addEventListener("click", () => handleAiGenerate());
-  if (aiCustomPrompt) {
-    aiCustomPrompt.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") handleAiGenerate();
-    });
-  }
-  document.querySelectorAll(".ai-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      document.querySelectorAll(".ai-chip").forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-      const p = chip.getAttribute("data-prompt");
-      if (aiCustomPrompt) aiCustomPrompt.value = p;
-      handleAiGenerate(p);
-    });
   });
 
   // Scene background options
