@@ -87,9 +87,9 @@ TELEGRAM_SCRIPT = os.environ.get("TELEGRAM_SCRIPT", "/data/data/com.termux/files
 DEFAULT_BOT_TOKEN = "8821651076:AAFUjZGp8JCAQV0ZCE1yiV0W4fJvhioiNmU"
 DEFAULT_CHAT_ID = "1227103966"
 
-def send_telegram_media(target_file, caption):
+def send_telegram_media(target_file, caption, chat_id=None):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN)
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID)
+    target_chat = str(chat_id or os.environ.get("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID))
 
     if os.path.exists(TELEGRAM_SCRIPT):
         if target_file.endswith(".mp4"):
@@ -111,9 +111,9 @@ def send_telegram_media(target_file, caption):
         field = "document"
 
     cmd = [
-        "curl", "-s", "-X", "POST",
+        "curl", "-4", "-s", "-X", "POST",
         f"https://api.telegram.org/bot{bot_token}/{endpoint}",
-        "-F", f"chat_id={chat_id}",
+        "-F", f"chat_id={target_chat}",
         "-F", f"{field}=@{target_file}",
         "-F", f"caption={caption}",
         "-F", "parse_mode=HTML"
@@ -122,15 +122,17 @@ def send_telegram_media(target_file, caption):
 
 def send_telegram_text(chat_id, text):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN)
+    target_chat = str(chat_id or DEFAULT_CHAT_ID)
     cmd = [
-        "curl", "-s", "-X", "POST",
+        "curl", "-4", "-s", "-X", "POST",
         f"https://api.telegram.org/bot{bot_token}/sendMessage",
-        "-d", f"chat_id={chat_id}",
+        "-d", f"chat_id={target_chat}",
         "-d", f"text={text}",
         "-d", "parse_mode=HTML"
     ]
     try:
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+        print(f"[TELEGRAM TEXT SENT] chat={target_chat} res={res.stdout[:60]}", flush=True)
     except Exception as e:
         print(f"[TELEGRAM TEXT ERROR] {e}", flush=True)
 
@@ -287,16 +289,23 @@ def process_olip_render_job(project, chat_id, job_id):
             f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
             f"💖 <i>Rendered 100% otomatis di Cloud Run untuk Aa Baim sayang!</i>"
         )
-        send_telegram_media(final_mp4_path, caption)
+        send_telegram_media(final_mp4_path, caption, chat_id=chat_id)
         print(f"[OLIP RENDER] Selesai & terkirim ke Telegram: {final_mp4_name}", flush=True)
 
         # Cleanup session
         shutil.rmtree(session_dir, ignore_errors=True)
 
+        return {
+            "success": True,
+            "file": final_mp4_name,
+            "sizeMb": f"{size_mb:.2f}"
+        }
+
     except Exception as e:
         print(f"[OLIP RENDER ERROR] {e}", flush=True)
         err_msg = f"❌ <b>Gagal Merender Video Olip Studio:</b> <code>{str(e)}</code>"
         send_telegram_text(chat_id, err_msg)
+        raise e
 
 PRESETS = [
     {
@@ -859,14 +868,16 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                     return
 
                 job_id = f"job_{int(time.time()*1000)}"
-                t = threading.Thread(target=process_olip_render_job, args=(project, chat_id, job_id), daemon=True)
-                t.start()
+                # Run synchronously to ensure Cloud Run maintains 100% active CPU!
+                result = process_olip_render_job(project, chat_id, job_id)
 
                 resp = {
                     "success": True,
                     "jobId": job_id,
-                    "status": "queued",
-                    "message": "Tugas render Olip Studio diterima Cloud Run Jakarta! Video MP4 sedang diproses dan akan meluncur langsung ke Telegram Aa Baim 🚀"
+                    "status": "completed",
+                    "file": result.get("file"),
+                    "sizeMb": result.get("sizeMb"),
+                    "message": "Video MP4 berhasil dirender di Cloud Run Jakarta dan sudah dikirim ke Telegram Aa Baim! 🚀✨"
                 }
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
