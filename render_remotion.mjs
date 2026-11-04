@@ -30,9 +30,12 @@ async function main() {
   const raw = fs.readFileSync(inputJsonPath, "utf-8");
   const project = JSON.parse(raw);
 
-  const bundleDir = path.resolve(__dirname, "remotion-bundle");
+  let bundleDir = path.resolve(__dirname, "build");
   if (!fs.existsSync(bundleDir)) {
-    console.error(`[Remotion Render ERROR] Bundle directory not found at ${bundleDir}`);
+    bundleDir = path.resolve(__dirname, "remotion-bundle");
+  }
+  if (!fs.existsSync(bundleDir)) {
+    console.error(`[Remotion Render ERROR] Bundle directory not found at ${bundleDir} or build/`);
     process.exit(1);
   }
 

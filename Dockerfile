@@ -47,7 +47,7 @@ RUN npx remotion browser ensure
 COPY . .
 
 # Pre-bundle Remotion composition so renders start instantly with 0 compile latency!
-RUN npx remotion bundle src/remotion/entry.tsx remotion-bundle
+RUN npx remotion bundle src/remotion/entry.tsx --out-dir=remotion-bundle
 
 # Ensure runtime directories exist
 RUN mkdir -p out data
