@@ -3,6 +3,8 @@
 > Mobile-First Vertical Video Generator with Handwritten Diary Aesthetics, Realistic 3D Page Flip (Kebetan), Unlimited Multi-Page / Novel Serial Support, Pro Stamps & Overlays, and Built-In AI Collaboration via `agy -p`.
 > Specially crafted with love by **Revai** for **Aa Baim** (@BUNGTEMIN).
 
+🌐 **Live Cloud Run Studio**: [https://diary-studio-280833756345.asia-southeast2.run.app](https://diary-studio-280833756345.asia-southeast2.run.app) (Region: Jakarta, 100% Free Tier Scale-to-Zero)
+
 ---
 
 ## ✨ Fitur Unggulan (v3.0)
