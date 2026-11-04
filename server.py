@@ -5,6 +5,7 @@ Provides full REST API and serves the dual-pane Web Studio UI.
 Runs on 0.0.0.0:8095
 """
 
+import base64
 import json
 import mimetypes
 import os
@@ -118,6 +119,184 @@ def send_telegram_media(target_file, caption):
         "-F", "parse_mode=HTML"
     ]
     return subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+def send_telegram_text(chat_id, text):
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN)
+    cmd = [
+        "curl", "-s", "-X", "POST",
+        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+        "-d", f"chat_id={chat_id}",
+        "-d", f"text={text}",
+        "-d", "parse_mode=HTML"
+    ]
+    try:
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+    except Exception as e:
+        print(f"[TELEGRAM TEXT ERROR] {e}", flush=True)
+
+def escape_ffmpeg_text(text=""):
+    if not text:
+        return ""
+    t = str(text).replace("\r", "").replace("\n", " ")
+    t = t.replace("\\", "\\\\").replace("'", "’").replace(":", "\\:").replace("%", "\\%").replace(";", "\\;")
+    return t
+
+def process_olip_render_job(project, chat_id, job_id):
+    try:
+        timestamp = int(time.time())
+        session_dir = os.path.join(OUT_DIR, f"olip_{timestamp}")
+        os.makedirs(session_dir, exist_ok=True)
+
+        scenes = project.get("scenes", [])
+        total_seconds = sum(max(float(s.get("durationInSeconds", 5)), 2) for s in scenes) if scenes else 5
+        title = project.get("title", "Olip Video Studio")
+        author_name = project.get("authorName", "Aa Baim")
+        author_handle = project.get("authorHandle", "@bungtemin")
+
+        # Notify start
+        start_msg = (
+            f"🎬 <b>PROSES RENDER OLIP DIMULAI DI CLOUD RUN!</b> 🚀✨\n\n"
+            f"📌 <b>Judul:</b> {title}\n"
+            f"⏱️ <b>Durasi:</b> {total_seconds:.1f} Detik\n"
+            f"🎞️ <b>Adegan:</b> {len(scenes)} Scene\n"
+            f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
+            f"<i>Video MP4 1080×1920 sedang dirender... Mohon tunggu sebentar ya Aa Baim!</i> ⏳💖"
+        )
+        send_telegram_text(chat_id, start_msg)
+
+        # Resolve font
+        font_p = os.path.join(BASE_DIR, "assets", "fonts", "PatrickHand-Regular.ttf")
+        font_arg = f":fontfile='{font_p}'" if os.path.exists(font_p) else ""
+
+        scene_files = []
+        for i, scene in enumerate(scenes):
+            duration = max(float(scene.get("durationInSeconds", 5)), 2)
+            scene_clip = os.path.join(session_dir, f"scene_{i}.mp4")
+            scene_title = scene.get("title") or f"Adegan {i + 1}"
+            scene_content = (scene.get("content") or "")[:250]
+            scene_type = scene.get("sceneType", "code")
+
+            image_url = scene.get("imageUrl", "")
+            if scene_type == "image" and image_url and image_url.startswith("data:image"):
+                base64_data = re.sub(r"^data:image/\w+;base64,", "", image_url)
+                img_path = os.path.join(session_dir, f"img_{i}.jpg")
+                with open(img_path, "wb") as f:
+                    f.write(base64.b64decode(base64_data))
+
+                zoompan_filter = (
+                    f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
+                    f"zoompan=z='min(zoom+0.0015,1.15)':d={int(duration * 30)}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=30,"
+                    f"drawbox=y=ih-320:color=black@0.6:width=iw:height=320:t=fill,"
+                    f"drawtext=text='{escape_ffmpeg_text(scene_title)}'{font_arg}:fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-260:box=1:boxcolor=black@0.4:boxborderw=10,"
+                    f"drawtext=text='{escape_ffmpeg_text(scene_content)}'{font_arg}:fontcolor=#38bdf8:fontsize=28:x=(w-text_w)/2:y=h-170,"
+                    f"drawtext=text='Olip Video Studio • {escape_ffmpeg_text(author_name)}'{font_arg}:fontcolor=#94a3b8:fontsize=22:x=(w-text_w)/2:y=h-80"
+                )
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-loop", "1",
+                    "-i", img_path,
+                    "-vf", zoompan_filter,
+                    "-t", str(duration),
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-preset", "ultrafast",
+                    scene_clip
+                ]
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            else:
+                bg_colors = {
+                    "code": "#0f172a",
+                    "story": "#090d16",
+                    "spectrum": "#050505",
+                }
+                bg_color = bg_colors.get(scene_type, "#0f172a")
+                accent_color = "#38bdf8" if scene_type == "code" else "#a855f7" if scene_type == "story" else "#10b981"
+                subtitle = scene.get("subtitle", "")
+
+                filter_string = (
+                    f"color=c={bg_color}:s=1080x1920:d={duration}:r=30,"
+                    f"drawbox=x=80:y=200:w=920:h=1520:color=#1e293b@0.85:t=fill,"
+                    f"drawbox=x=80:y=200:w=920:h=80:color=#0f172a:t=fill,"
+                    f"drawbox=x=120:y=232:w=16:h=16:color=#ef4444:t=fill,"
+                    f"drawbox=x=150:y=232:w=16:h=16:color=#f59e0b:t=fill,"
+                    f"drawbox=x=180:y=232:w=16:h=16:color=#10b981:t=fill,"
+                    f"drawtext=text='Olip Studio • {escape_ffmpeg_text(scene.get('name', 'Scene'))}'{font_arg}:fontcolor=#94a3b8:fontsize=24:x=220:y=228,"
+                    f"drawtext=text='{escape_ffmpeg_text(scene_title)}'{font_arg}:fontcolor=white:fontsize=52:x=120:y=340,"
+                    f"drawtext=text='{escape_ffmpeg_text(subtitle)}'{font_arg}:fontcolor={accent_color}:fontsize=32:x=120:y=420,"
+                    f"drawtext=text='{escape_ffmpeg_text(scene_content)}'{font_arg}:fontcolor=#e2e8f0:fontsize=36:line_spacing=20:x=120:y=520,"
+                    f"drawtext=text='{escape_ffmpeg_text(author_name)} • Olip Studio'{font_arg}:fontcolor=#64748b:fontsize=26:x=(w-text_w)/2:y=1640"
+                )
+                cmd = [
+                    "ffmpeg", "-y",
+                    "-f", "lavfi",
+                    "-i", filter_string,
+                    "-t", str(duration),
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-preset", "ultrafast",
+                    scene_clip
+                ]
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+            if os.path.exists(scene_clip):
+                scene_files.append(scene_clip)
+
+        if not scene_files:
+            raise RuntimeError("Tidak ada adegan yang berhasil dikompilasi.")
+
+        concat_list = os.path.join(session_dir, "concat.txt")
+        with open(concat_list, "w") as f:
+            for p in scene_files:
+                f.write(f"file '{p}'\n")
+
+        merged_video = os.path.join(session_dir, "merged.mp4")
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_list,
+            "-c", "copy",
+            merged_video
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        final_mp4_name = f"olip_video_{timestamp}.mp4"
+        final_mp4_path = os.path.join(OUT_DIR, final_mp4_name)
+
+        # Merge with audio
+        subprocess.run([
+            "ffmpeg", "-y",
+            "-i", merged_video,
+            "-f", "lavfi",
+            "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-shortest",
+            "-movflags", "+faststart",
+            final_mp4_path
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        size_mb = os.path.getsize(final_mp4_path) / (1024 * 1024)
+
+        caption = (
+            f"🎬 <b>{title}</b> 🚀✨\n"
+            f"⏱️ <b>Durasi:</b> {total_seconds:.1f} Detik FULL HD (9:16 Portrait)\n"
+            f"🎞️ <b>Adegan:</b> {len(scenes)} Scene\n"
+            f"💾 <b>Ukuran:</b> {size_mb:.2f} MB MP4\n"
+            f"👤 <b>Kreator:</b> {author_name} ({author_handle})\n"
+            f"☁️ <b>Server:</b> Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
+            f"💖 <i>Rendered 100% otomatis di Cloud Run untuk Aa Baim sayang!</i>"
+        )
+        send_telegram_media(final_mp4_path, caption)
+        print(f"[OLIP RENDER] Selesai & terkirim ke Telegram: {final_mp4_name}", flush=True)
+
+        # Cleanup session
+        shutil.rmtree(session_dir, ignore_errors=True)
+
+    except Exception as e:
+        print(f"[OLIP RENDER ERROR] {e}", flush=True)
+        err_msg = f"❌ <b>Gagal Merender Video Olip Studio:</b> <code>{str(e)}</code>"
+        send_telegram_text(chat_id, err_msg)
 
 PRESETS = [
     {
@@ -266,12 +445,17 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(audio_files, ensure_ascii=False).encode("utf-8"))
             return
 
-        if path == "/api/status":
+        if path == "/api/status" or path == "/health":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_cors_headers()
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "running", "uptime": time.time()}).encode("utf-8"))
+            self.wfile.write(json.dumps({
+                "status": "running",
+                "service": "Diary & Olip Video Studio Render Engine",
+                "region": "asia-southeast2 (Jakarta)",
+                "uptime": time.time()
+            }).encode("utf-8"))
             return
 
         if path == "/api/projects":
@@ -648,6 +832,41 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                     "status": "success" if res.returncode == 0 else "error",
                     "output": res.stdout.strip(),
                     "error": res.stderr.strip()
+                }
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(resp).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+            return
+
+        if path == "/api/render-job":
+            try:
+                project = body.get("project", {})
+                chat_id = str(body.get("chatId", DEFAULT_CHAT_ID))
+                if not project or not project.get("scenes"):
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_cors_headers()
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Payload proyek tidak valid"}).encode("utf-8"))
+                    return
+
+                job_id = f"job_{int(time.time()*1000)}"
+                t = threading.Thread(target=process_olip_render_job, args=(project, chat_id, job_id), daemon=True)
+                t.start()
+
+                resp = {
+                    "success": True,
+                    "jobId": job_id,
+                    "status": "queued",
+                    "message": "Tugas render Olip Studio diterima Cloud Run Jakarta! Video MP4 sedang diproses dan akan meluncur langsung ke Telegram Aa Baim 🚀"
                 }
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
