@@ -44,33 +44,27 @@
         </div>
       </div>
 
-      <div class="flex items-center space-x-1.5">
-        <!-- SQLite Projects Button -->
-        <button id="btnOpenProjectsModal" class="px-2.5 py-1 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-semibold flex items-center space-x-1 transition-all active:scale-95" title="Koleksi Draft & Proyek Tersimpan di SQLite">
+      <!-- Super Compact & Aesthetic Header Actions -->
+      <div class="flex items-center space-x-1.5 shrink-0">
+        <!-- Quick Save Icon Button (Compact 32x32) -->
+        <button id="btnSaveProjectQuick" class="w-8 h-8 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 flex items-center justify-center text-sm transition-all active:scale-90" title="Simpan Cepat ke SQLite (Ctrl+S)">
+          <span id="iconSaveState">💾</span>
+        </button>
+
+        <!-- SQLite Projects Icon Button (Compact 32x32) -->
+        <button id="btnOpenProjectsModal" class="w-8 h-8 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 flex items-center justify-center text-sm transition-all active:scale-90" title="Buka Histori & Koleksi Proyek (SQLite)">
           <span>📁</span>
-          <span class="hidden sm:inline">Proyek</span>
         </button>
 
-        <!-- Quick Save Button -->
-        <button id="btnSaveProjectQuick" class="px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center space-x-1 transition-all active:scale-95" title="Simpan Catatan ke Database SQLite">
-          <span>💾</span>
-          <span class="hidden sm:inline">Simpan</span>
+        <!-- Quick Preset Icon Button (Compact 32x32) -->
+        <button id="btnOpenPresets" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700/80 flex items-center justify-center text-xs transition-all active:scale-90" title="Pilihan Preset Inspirasi">
+          <span>⚡</span>
         </button>
 
-        <!-- Quick Preset Pill -->
-        <button id="btnOpenPresets" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700 flex items-center space-x-1 transition-all active:scale-95">
-          <span>⚡ Preset</span>
-        </button>
-
-        <!-- Reset Button -->
-        <button id="btnResetAll" title="Reset ke semula" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all active:scale-95">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        </button>
-
-        <!-- Primary Export Button -->
-        <button id="btnOpenExport" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold text-xs flex items-center space-x-1 shadow-md shadow-pink-500/20 active:scale-95 transition-all">
+        <!-- Primary Export Button (Compact Gradient Pill) -->
+        <button id="btnOpenExport" class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-bold text-xs flex items-center space-x-1 shadow-md shadow-pink-500/20 active:scale-95 transition-all">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-          <span>Export</span>
+          <span class="text-[11px]">Export</span>
         </button>
       </div>
     </header>
@@ -647,6 +641,12 @@
           <button id="btnClosePresetsModal" class="p-1 rounded-lg text-slate-400 hover:text-white">✕</button>
         </div>
         <div id="presetsContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
+          <button id="btnResetAll" class="text-[11px] text-slate-400 hover:text-rose-400 flex items-center space-x-1 transition-all" title="Reset naskah dan format ke awal">
+            <span>🔄</span>
+            <span>Reset ke Pengaturan Awal</span>
+          </button>
+        </div>
       </div>
     </div>
 

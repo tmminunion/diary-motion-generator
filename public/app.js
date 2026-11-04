@@ -1251,6 +1251,11 @@ async function saveCurrentProjectToDb() {
     const json = await res.json();
     if (json.status === "success") {
       state.project_id = json.id;
+      const ico = document.getElementById("iconSaveState");
+      if (ico) {
+        ico.textContent = "✅";
+        setTimeout(() => { ico.textContent = "💾"; }, 1500);
+      }
       showToast("💾 Proyek Tersimpan!", `Proyek "${state.title}" berhasil disimpan ke SQLite!`);
       const modal = document.getElementById("modalProjects");
       if (modal && !modal.classList.contains("hidden")) {
