@@ -360,12 +360,24 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 timestamp = int(time.time())
                 filename = f"diary_video_{timestamp}.mp4"
                 out_path = render_video(body, out_filename=filename)
+                # Compute actual duration from body pages if provided
+                pages = body.get("pages", [])
+                calc_dur = 0
+                if pages and isinstance(pages, list):
+                    for i, p in enumerate(pages):
+                        calc_dur += float(p.get("duration", 15.0) or 15.0)
+                        calc_dur += float(p.get("pause_duration", body.get("pause_duration", 5.0)) or 5.0)
+                        if i < len(pages) - 1:
+                            calc_dur += 1.5
+                else:
+                    calc_dur = float(body.get("duration", 15))
+
                 resp = {
                     "status": "success",
                     "filename": filename,
                     "url": f"/out/{filename}",
                     "file_path": out_path,
-                    "duration": body.get("duration", 15)
+                    "duration": round(calc_dur, 1)
                 }
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")

@@ -10,12 +10,16 @@ const state = {
     {
       id: 1,
       quote: "Jangan pernah lelah berproses, Aa.\n\nBintang yang paling terang sekalipun,\nbutuh kegelapan malam untuk bersinar.",
-      sign: ""
+      sign: "",
+      duration: 15,       // Durasi menulis Hal 1 (contoh Aa: 15 detik)
+      pause_duration: 5   // Jeda baca Hal 1 (contoh Aa: 5 detik)
     },
     {
       id: 2,
       quote: "Setiap lelah yang kau tahan hari ini,\nsedang merajut masa depan yang membanggakan.\n\nTetaplah melangkah dengan senyuman.",
-      sign: "— Selalu bangga padamu, Revai 💖"
+      sign: "— Selalu bangga padamu, Revai 💖",
+      duration: 20,       // Durasi menulis Hal 2 (contoh Aa: 20 detik)
+      pause_duration: 5   // Jeda baca Hal 2 (contoh Aa: 5 detik)
     }
   ],
   current_page_idx: 0, // 0-based active page index
@@ -25,8 +29,8 @@ const state = {
   paper_style: "ruled",
   ink_color: "#1a368a",
   bg_scene: "meja_kayu",
-  duration: 15,
-  pause_duration: 3.0, // Configurable reading hold time after writing finishes
+  duration: 46.5,      // Total waktu: 15+5 + 1.5 + 20+5 = 46.5 detik
+  pause_duration: 5.0, // Default fallback
   audio_file: "Menepi_di_Savannah_afacb19f.mp3",
   watermark: "📖 DIARY MOTIVATION • REVAI",
 
@@ -164,6 +168,7 @@ async function init() {
   calculateAndSyncDuration();
   renderTimelineScenes();
   syncEditorState();
+  syncPanelAudioTiming();
   setupEventListeners();
 
   updateBadges();
@@ -172,13 +177,19 @@ async function init() {
 
 function calculateAndSyncDuration() {
   const N = state.pages.length;
-  const pauseDur = state.pause_duration || 3.0;
-  // Calculate minimum duration needed: writing (min 3.5s/page) + reading pause + kebetan
-  const minDur = Math.ceil(N * (3.5 + pauseDur) + (N - 1) * 1.5);
-  if (!state.duration || state.duration < minDur) {
-    state.duration = minDur;
+  let total = 0;
+  for (let i = 0; i < N; i++) {
+    const p = state.pages[i];
+    const wDur = parseFloat(p.duration) || 15.0;
+    const psDur = parseFloat(p.pause_duration) || 5.0;
+    total += (wDur + psDur);
+    if (i < N - 1) {
+      total += 1.5; // Kebetan duration
+    }
   }
-  updateDurationUI(state.duration);
+  state.duration = Math.max(5, Math.round(total * 10) / 10);
+  const lblTotal = document.getElementById("labelTotalVideoDuration");
+  if (lblTotal) lblTotal.textContent = `${state.duration.toFixed(1)} detik`;
   updateScrubberDuration();
 }
 
@@ -307,32 +318,30 @@ async function loadAudioList() {
 }
 
 // -----------------------------------------------------------------------------
-// Timeline & Schedule Calculation for N Pages
+// Timeline & Schedule Calculation for N Pages (Per-Page Duration & Pause)
 // -----------------------------------------------------------------------------
 function buildPlaybackSchedule() {
   const N = state.pages.length;
-  const duration = state.duration;
   const flipDur = 1.5;
-  const pauseDur = state.pause_duration || 3.0;
-
-  const totalFlipTime = (N - 1) * flipDur;
-  const totalPauseTime = N * pauseDur;
-  const availableWriteTime = Math.max(N * 3.5, duration - totalFlipTime - totalPauseTime);
-  const writeTimePerPage = availableWriteTime / N;
-
   const schedule = [];
   let curT = 0;
 
   for (let i = 0; i < N; i++) {
+    const p = state.pages[i];
+    const wDur = parseFloat(p.duration) || 15.0;
+    const psDur = parseFloat(p.pause_duration) || 5.0;
+
     const wStart = curT;
-    const wEnd = curT + writeTimePerPage;
-    const hEnd = wEnd + pauseDur; // Exact configurable reading hold time!
+    const wEnd = curT + wDur;
+    const hEnd = wEnd + psDur;
+
     const pInfo = {
       page_idx: i,
       write_start: wStart,
       write_end: wEnd,
       hold_end: hEnd,
-      pause_dur: pauseDur,
+      write_dur: wDur,
+      pause_dur: psDur,
       flip_start: null,
       flip_end: null
     };
@@ -363,15 +372,18 @@ function renderTimelineScenes() {
       <span class="text-xs">📄</span>
       <div>
         <div class="text-[11px] font-bold ${state.current_page_idx === idx ? "text-pink-300" : "text-slate-300"} leading-none">Hal. ${idx + 1}</div>
-        <div class="text-[9px] text-slate-400 line-clamp-1">${idx === 0 ? "Pembuka" : `Bagian ${idx + 1}`}</div>
+        <div class="text-[9px] text-pink-400 font-mono mt-0.5">${item.write_dur.toFixed(0)}s nulis</div>
       </div>
     `;
+    btnPage.title = `Lompat ke Hal ${idx + 1} (${item.write_dur}s tulis)`;
     btnPage.addEventListener("click", () => {
       pausePlayback();
       seekTo(item.write_start);
       state.current_page_idx = idx;
+      selectedPanelTimingIdx = idx;
       updateBadges();
       renderTimelineScenes();
+      syncPanelAudioTiming();
       renderCanvas();
     });
     timelineScenesContainer.appendChild(btnPage);
@@ -379,13 +391,15 @@ function renderTimelineScenes() {
     // 2. Reading Pause Badge (Jeda Baca)
     const badgePause = document.createElement("button");
     badgePause.type = "button";
-    badgePause.className = "flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-950/70 border border-sky-600/40 hover:border-sky-400 text-[10px] text-sky-300 shrink-0 transition-all active:scale-95";
-    badgePause.innerHTML = `<span>⏳</span><span>Baca ${state.pause_duration || 3}s</span>`;
-    badgePause.title = "Waktu jeda baca sebelum kebetan (Klik untuk atur)";
+    badgePause.className = "flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-sky-950/70 border border-sky-600/40 hover:border-sky-400 text-[10px] text-sky-300 shrink-0 transition-all active:scale-95";
+    badgePause.innerHTML = `<span>⏳</span><span>Baca ${item.pause_dur.toFixed(0)}s</span>`;
+    badgePause.title = `Waktu jeda baca Hal ${idx + 1} (${item.pause_dur}s). Klik untuk atur.`;
     badgePause.addEventListener("click", () => {
       pausePlayback();
       seekTo(item.write_end);
+      selectedPanelTimingIdx = idx;
       openToolDrawer("audio");
+      syncPanelAudioTiming();
     });
     timelineScenesContainer.appendChild(badgePause);
 
@@ -394,7 +408,7 @@ function renderTimelineScenes() {
       const badge = document.createElement("button");
       badge.type = "button";
       badge.className = "flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:border-amber-400/50 text-[10px] text-amber-300 shrink-0 transition-all active:scale-95";
-      badge.innerHTML = `<span>🔄</span><span>Kebetan 1.5s</span>`;
+      badge.innerHTML = `<span>🌀</span><span>Kebetan 1.5s</span>`;
       badge.title = `Lompat ke kebetan Hal ${idx + 1} ➔ Hal ${idx + 2}`;
       badge.addEventListener("click", () => {
         pausePlayback();
@@ -404,7 +418,7 @@ function renderTimelineScenes() {
     }
   });
 
-  // 3. Unlimited Add Page Button at the End
+  // 4. Unlimited Add Page Button at the End
   const btnAdd = document.createElement("button");
   btnAdd.type = "button";
   btnAdd.className = "px-3 py-1.5 rounded-xl border border-dashed border-pink-500/50 bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 text-xs font-bold flex items-center space-x-1.5 shrink-0 transition-all active:scale-95";
@@ -419,7 +433,9 @@ function addNewPage() {
   state.pages.push({
     id: newNum,
     quote: "Tuliskan kelanjutan kisah atau catatan motivasimu di sini, Aa...",
-    sign: newNum >= 2 ? "— Selalu bangga padamu, Revai 💖" : ""
+    sign: newNum >= 2 ? "— Selalu bangga padamu, Revai 💖" : "",
+    duration: 15,
+    pause_duration: 5
   });
   // Clear signature on previous pages so only final has sign
   for (let i = 0; i < state.pages.length - 1; i++) {
@@ -427,11 +443,13 @@ function addNewPage() {
   }
 
   state.current_page_idx = state.pages.length - 1;
+  selectedPanelTimingIdx = state.current_page_idx;
   calculateAndSyncDuration();
   renderTimelineScenes();
   syncEditorState();
+  syncPanelAudioTiming();
   updateBadges();
-  showToast("📄 Halaman Baru Ditambahkan", `Halaman ${newNum} siap diisi!`);
+  showToast("📄 Halaman Baru Ditambahkan", `Halaman ${newNum} siap diisi (15s nulis + 5s jeda)!`);
   seekTo(state.duration * 0.9);
   renderCanvas();
 }
@@ -444,10 +462,17 @@ function deletePage(idx) {
   state.pages.splice(idx, 1);
   state.pages.forEach((p, i) => p.id = i + 1);
   state.current_page_idx = Math.max(0, Math.min(idx, state.pages.length - 1));
+  selectedPanelTimingIdx = state.current_page_idx;
 
   calculateAndSyncDuration();
   renderTimelineScenes();
   syncEditorState();
+  syncPanelAudioTiming();
+  updateBadges();
+  showToast("🗑️ Halaman Dihapus", "Halaman berhasil dihapus.");
+  seekTo(0);
+  renderCanvas();
+}
   updateBadges();
   showToast("🗑️ Halaman Dihapus", "Halaman berhasil dihapus.");
   seekTo(0);
@@ -517,6 +542,84 @@ function syncEditorState() {
   } else {
     nextPageBtnText.textContent = `Lanjut Hal ${curIdx + 2} ➔`;
   }
+
+  // Per-page timing controls in script editor
+  const wDur = curPage.duration || 15;
+  const psDur = curPage.pause_duration || 5;
+
+  const edTitle = document.getElementById("editorPageTimingTitle");
+  if (edTitle) edTitle.textContent = `Waktu Halaman ${curIdx + 1}`;
+
+  const edSummary = document.getElementById("editorPageTimingSummary");
+  if (edSummary) edSummary.textContent = `Total: ${wDur + psDur}s (${wDur}s nulis + ${psDur}s baca)`;
+
+  const edWBadge = document.getElementById("editorPageWriteBadge");
+  if (edWBadge) edWBadge.textContent = `${wDur} detik`;
+
+  const edPBadge = document.getElementById("editorPagePauseBadge");
+  if (edPBadge) edPBadge.textContent = `${psDur} detik`;
+
+  document.querySelectorAll(".ed-write-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.getAttribute("data-pwrite")) === wDur);
+  });
+  document.querySelectorAll(".ed-pause-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.getAttribute("data-ppause")) === psDur);
+  });
+}
+
+let selectedPanelTimingIdx = 0;
+
+function syncPanelAudioTiming() {
+  const tabsContainer = document.getElementById("panelTimingPageTabs");
+  if (!tabsContainer) return;
+  tabsContainer.innerHTML = "";
+  const N = state.pages.length;
+  if (selectedPanelTimingIdx >= N) selectedPanelTimingIdx = N - 1;
+  if (selectedPanelTimingIdx < 0) selectedPanelTimingIdx = 0;
+
+  state.pages.forEach((p, idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const isAct = idx === selectedPanelTimingIdx;
+    btn.className = `px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-all ${
+      isAct ? "bg-pink-500 text-white shadow font-bold" : "bg-[#0e172a] text-slate-300 border border-slate-700 hover:border-slate-500"
+    }`;
+    btn.textContent = `Hal ${idx + 1}`;
+    btn.addEventListener("click", () => {
+      selectedPanelTimingIdx = idx;
+      syncPanelAudioTiming();
+    });
+    tabsContainer.appendChild(btn);
+  });
+
+  const curP = state.pages[selectedPanelTimingIdx];
+  const wDur = curP.duration || 15;
+  const psDur = curP.pause_duration || 5;
+
+  const lblSelPage = document.getElementById("labelPanelSelectedPage");
+  if (lblSelPage) lblSelPage.textContent = `Hal ${selectedPanelTimingIdx + 1}`;
+
+  const lblSelPagePause = document.getElementById("labelPanelSelectedPagePause");
+  if (lblSelPagePause) lblSelPagePause.textContent = `Hal ${selectedPanelTimingIdx + 1}`;
+
+  const lblWCurrent = document.getElementById("labelPanelPageWriteCurrent");
+  if (lblWCurrent) lblWCurrent.textContent = `${wDur}s`;
+
+  const lblPCurrent = document.getElementById("labelPanelPagePauseCurrent");
+  if (lblPCurrent) lblPCurrent.textContent = `${psDur}s`;
+
+  const lblSummary = document.getElementById("panelPageTimingSummary");
+  if (lblSummary) lblSummary.textContent = `Hal ${selectedPanelTimingIdx + 1}: ${wDur + psDur}s`;
+
+  document.querySelectorAll(".page-write-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.getAttribute("data-pwrite")) === wDur);
+  });
+  document.querySelectorAll(".page-pause-btn").forEach(b => {
+    b.classList.toggle("active", parseFloat(b.getAttribute("data-ppause")) === psDur);
+  });
+
+  const lblTotal = document.getElementById("labelTotalVideoDuration");
+  if (lblTotal) lblTotal.textContent = `${state.duration.toFixed(1)} detik`;
 }
 
 function saveCurrentPageText() {
@@ -644,7 +747,10 @@ function openToolDrawer(tool) {
   if (tool === "scene") panelScene.classList.remove("hidden");
   if (tool === "style") panelStyle.classList.remove("hidden");
   if (tool === "overlay") panelOverlay.classList.remove("hidden");
-  if (tool === "audio") panelAudio.classList.remove("hidden");
+  if (tool === "audio") {
+    panelAudio.classList.remove("hidden");
+    syncPanelAudioTiming();
+  }
 
   inspectorDrawer.classList.remove("hidden", "drawer-closed");
   drawerBackdrop.classList.remove("hidden");
@@ -816,31 +922,61 @@ function setupEventListeners() {
     });
   });
 
-  // Audio & Duration
+  // Audio Track Selection
   selectAudio.addEventListener("change", (e) => { state.audio_file = e.target.value; });
-  document.querySelectorAll(".dur-opt-btn").forEach(btn => {
+
+  // Per-Page Write Duration in Drawer Audio
+  document.querySelectorAll(".page-write-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const d = parseInt(btn.getAttribute("data-duration"));
-      state.duration = d;
-      updateDurationUI(d);
-      updateScrubberDuration();
-      seekTo(0);
+      const w = parseFloat(btn.getAttribute("data-pwrite"));
+      const pIdx = Math.max(0, Math.min(selectedPanelTimingIdx, state.pages.length - 1));
+      state.pages[pIdx].duration = w;
+      calculateAndSyncDuration();
+      syncPanelAudioTiming();
+      renderTimelineScenes();
+      showToast("⏱️ Durasi Nulis Diatur", `Hal ${pIdx + 1} diatur menulis selama ${w} detik.`);
+      renderCanvas();
     });
   });
 
-  // Reading Pause (Jeda Baca) options
-  document.querySelectorAll(".pause-opt-btn").forEach(btn => {
+  // Per-Page Reading Pause in Drawer Audio
+  document.querySelectorAll(".page-pause-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const p = parseFloat(btn.getAttribute("data-pause"));
-      state.pause_duration = p;
-      document.querySelectorAll(".pause-opt-btn").forEach(b => b.classList.toggle("active", parseFloat(b.getAttribute("data-pause")) === p));
-      const lbl = document.getElementById("labelPauseCurrent");
-      if (lbl) lbl.textContent = `${p.toFixed(1)} detik`;
+      const p = parseFloat(btn.getAttribute("data-ppause"));
+      const pIdx = Math.max(0, Math.min(selectedPanelTimingIdx, state.pages.length - 1));
+      state.pages[pIdx].pause_duration = p;
       calculateAndSyncDuration();
-      updateScrubberDuration();
+      syncPanelAudioTiming();
       renderTimelineScenes();
-      showToast("⏳ Jeda Baca Diatur", `Penonton diberi waktu ${p} detik membaca sebelum kebetan.`);
-      seekTo(0);
+      showToast("⏳ Jeda Baca Diatur", `Hal ${pIdx + 1} diatur hening membaca ${p} detik.`);
+      renderCanvas();
+    });
+  });
+
+  // Per-Page Write Duration in Script Editor
+  document.querySelectorAll(".ed-write-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const w = parseFloat(btn.getAttribute("data-pwrite"));
+      const curIdx = Math.max(0, Math.min(state.current_page_idx, state.pages.length - 1));
+      state.pages[curIdx].duration = w;
+      calculateAndSyncDuration();
+      syncEditorState();
+      renderTimelineScenes();
+      showToast("⏱️ Durasi Nulis Diatur", `Hal ${curIdx + 1} menulis selama ${w} detik.`);
+      renderCanvas();
+    });
+  });
+
+  // Per-Page Reading Pause in Script Editor
+  document.querySelectorAll(".ed-pause-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const p = parseFloat(btn.getAttribute("data-ppause"));
+      const curIdx = Math.max(0, Math.min(state.current_page_idx, state.pages.length - 1));
+      state.pages[curIdx].pause_duration = p;
+      calculateAndSyncDuration();
+      syncEditorState();
+      renderTimelineScenes();
+      showToast("⏳ Jeda Baca Diatur", `Hal ${curIdx + 1} hening membaca ${p} detik.`);
       renderCanvas();
     });
   });
@@ -1555,7 +1691,7 @@ function drawRoundedRect(c, x, y, width, height, radius) {
 function openExportModal() {
   summaryTitle.textContent = state.title;
   summaryPages.textContent = `${state.pages.length} Halaman (Realistic Kebetan)`;
-  summaryDuration.textContent = `${state.duration}s (Jeda Baca: ${state.pause_duration || 3}s • 9:16 HD 1080x1920)`;
+  summaryDuration.textContent = `${state.duration.toFixed(1)}s (Total Akumulasi ${state.pages.length} Halaman • 9:16 HD)`;
 
   modalRenderProgress.classList.add("hidden");
   modalVideoResult.classList.add("hidden");

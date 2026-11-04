@@ -246,13 +246,17 @@ def get_normalized_pages(config):
                 pages.append({
                     "id": i + 1,
                     "quote": parse_quote_input(p.get("quote", "")),
-                    "sign": p.get("sign", "")
+                    "sign": p.get("sign", ""),
+                    "duration": float(p.get("duration", 0)),
+                    "pause_duration": float(p.get("pause_duration", 0))
                 })
             elif isinstance(p, str):
                 pages.append({
                     "id": i + 1,
                     "quote": parse_quote_input(p),
-                    "sign": ""
+                    "sign": "",
+                    "duration": 0.0,
+                    "pause_duration": 0.0
                 })
         return pages
 
@@ -541,6 +545,63 @@ def render_video(config, out_filename="diary_handwriting.mp4", progress_callback
         tot_chars = sum(len(l) for l in p["quote"] if l.strip()) or 1
         page_total_chars.append(tot_chars)
 
+    # -------------------------------------------------------------------------
+    # TIMELINE CALCULATION: PER-PAGE TIMING (Duration & Reading Pause per page)
+    # -------------------------------------------------------------------------
+    default_pause = float(config.get("pause_duration", 3.0))
+    flip_frames = int(1.5 * FPS) if N > 1 else 0
+
+    has_custom_page_durs = any(p.get("duration", 0) > 0 for p in pages)
+    global_dur = float(config.get("duration", 15))
+
+    if not has_custom_page_durs:
+        total_flip_time = (N - 1) * 1.5
+        total_pause_time = sum((p.get("pause_duration", 0) or default_pause) for p in pages)
+        avail_write = max(N * 3.5, global_dur - total_flip_time - total_pause_time)
+        fallback_page_write = avail_write / N
+    else:
+        fallback_page_write = 10.0
+
+    timeline = []
+    cur_f = 0
+    for i in range(N):
+        p = pages[i]
+        w_dur = float(p.get("duration", 0))
+        if w_dur <= 0:
+            w_dur = fallback_page_write
+
+        ps_dur = float(p.get("pause_duration", 0))
+        if ps_dur <= 0:
+            ps_dur = default_pause
+
+        write_frames = int(w_dur * FPS)
+        pause_frames = int(ps_dur * FPS)
+
+        w_start = cur_f
+        w_end = cur_f + write_frames
+        h_end = w_end + pause_frames
+
+        p_info = {
+            "page_idx": i,
+            "write_start": w_start,
+            "write_end": w_end,
+            "hold_end": h_end,
+            "write_dur": w_dur,
+            "pause_dur": ps_dur,
+            "flip_start": None,
+            "flip_end": None
+        }
+        cur_f = h_end
+        if i < N - 1:
+            p_info["flip_start"] = cur_f
+            p_info["flip_end"] = cur_f + flip_frames
+            cur_f += flip_frames
+
+        timeline.append(p_info)
+
+    actual_total_frames = cur_f
+    actual_total_duration = actual_total_frames / float(FPS)
+
     audio_choice = config.get("audio_file", "Menepi_di_Savannah_afacb19f.mp3")
     audio_path = os.path.join(AUDIO_DIR, audio_choice) if audio_choice else None
     has_audio = audio_path and os.path.exists(audio_path)
@@ -556,11 +617,12 @@ def render_video(config, out_filename="diary_handwriting.mp4", progress_callback
     ]
 
     if has_audio:
-        fade_start = max(1, duration - 2)
+        fade_start = max(1.0, actual_total_duration - 2.0)
         ffmpeg_cmd.extend([
+            "-stream_loop", "-1",
             "-i", audio_path,
-            "-af", f"afade=t=out:st={fade_start}:d=2",
-            "-shortest"
+            "-t", f"{actual_total_duration:.3f}",
+            "-af", f"afade=t=out:st={fade_start:.3f}:d=2"
         ])
 
     ffmpeg_cmd.extend([
@@ -574,43 +636,9 @@ def render_video(config, out_filename="diary_handwriting.mp4", progress_callback
 
     ffmpeg_cmd.append(out_path)
 
-    print(f"[Engine v3.0] Unlimited Multi-Page Render: {out_path} ({duration}s, {N} Pages, BG: {scene_key})...", flush=True)
+    print(f"[Engine v3.1] Multi-Page Render: {out_path} ({actual_total_duration:.1f}s, {N} Pages, BG: {scene_key})...", flush=True)
     proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     t0 = time.time()
-
-    # Timeline calculation for N pages with configurable Reading Pause (Jeda Baca)
-    pause_dur = float(config.get("pause_duration", 3.0))
-    pause_frames = int(pause_dur * FPS)
-    flip_frames = int(1.5 * FPS) if N > 1 else 0
-    total_flip_frames = (N - 1) * flip_frames
-    total_pause_frames = N * pause_frames
-
-    available_write_frames = max(N * int(3.5 * FPS), total_frames - total_flip_frames - total_pause_frames)
-    write_frames_per_page = available_write_frames // N
-
-    # Build sequence timetable
-    timeline = []
-    cur_f = 0
-    for i in range(N):
-        w_start = cur_f
-        w_end = cur_f + write_frames_per_page
-        h_end = w_end + pause_frames  # Audience reading hold time!
-        p_info = {
-            "page_idx": i,
-            "write_start": w_start,
-            "write_end": w_end,
-            "hold_end": h_end,
-            "flip_start": None,
-            "flip_end": None
-        }
-        cur_f = h_end
-        if i < N - 1:
-            p_info["flip_start"] = cur_f
-            p_info["flip_end"] = cur_f + flip_frames
-            cur_f += flip_frames
-        timeline.append(p_info)
-
-    actual_total_frames = cur_f
 
     for frame in range(actual_total_frames):
         img = None

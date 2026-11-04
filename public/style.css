@@ -109,11 +109,18 @@
   transition: color 0.15s ease;
 }
 
-.bg-opt-btn.active, .font-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .pause-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, #btnOptSinglePage.active, #btnOptDoublePage.active {
+.bg-opt-btn.active, .font-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .pause-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, #btnOptSinglePage.active, #btnOptDoublePage.active, .page-write-btn.active, .ed-write-btn.active {
   border-color: rgba(236, 72, 153, 0.9) !important;
   background-color: rgba(236, 72, 153, 0.22) !important;
   color: #f472b6 !important;
   box-shadow: 0 0 12px rgba(236, 72, 153, 0.25);
+}
+
+.page-pause-btn.active, .ed-pause-btn.active {
+  border-color: rgba(56, 189, 248, 0.9) !important;
+  background-color: rgba(56, 189, 248, 0.22) !important;
+  color: #38bdf8 !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
 }
 .bg-opt-btn.active .opt-title, .font-opt-btn.active .opt-title, .stamp-opt-btn.active .opt-title, .tape-opt-btn.active .opt-title, .photo-opt-btn.active .opt-title, .filter-opt-btn.active .opt-title, #btnOptSinglePage.active .opt-title, #btnOptDoublePage.active .opt-title {
   color: #f472b6 !important;

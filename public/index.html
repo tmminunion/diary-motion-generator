@@ -228,34 +228,64 @@
           </div>
         </div>
 
-        <!-- PANEL 4: AUDIO & DURASI -->
+        <!-- PANEL 4: AUDIO & DURASI WAKTU PER HALAMAN -->
         <div id="panelAudio" class="tool-panel hidden space-y-3">
           <div>
             <label class="block text-[11px] text-slate-400 mb-1">Backsound BGM</label>
             <select id="selectAudio" class="w-full bg-[#141e33] border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-pink-500"></select>
           </div>
-          <div>
-            <label class="block text-[11px] text-slate-400 mb-1">Durasi Video</label>
-            <div class="grid grid-cols-4 gap-2">
-              <button type="button" data-duration="10" class="dur-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">10s</button>
-              <button type="button" data-duration="15" class="dur-opt-btn active py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">15s</button>
-              <button type="button" data-duration="20" class="dur-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">20s</button>
-              <button type="button" data-duration="30" class="dur-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">30s</button>
+
+          <!-- Selector Halaman untuk Pengaturan Waktu -->
+          <div class="bg-[#141e33] border border-slate-700/80 rounded-xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] font-bold text-pink-300 flex items-center space-x-1">
+                <span>⏱️</span>
+                <span>Atur Waktu Per Halaman</span>
+              </label>
+              <span id="panelPageTimingSummary" class="text-[10px] text-emerald-400 font-mono font-semibold">Hal 1: 20s</span>
+            </div>
+
+            <!-- Page selector chips -->
+            <div id="panelTimingPageTabs" class="flex items-center space-x-1.5 overflow-x-auto no-scrollbar pb-1">
+              <!-- Filled dynamically: [Hal 1] [Hal 2] ... -->
+            </div>
+
+            <!-- Durasi Nulis Page Terpilih -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] text-slate-400">Durasi Menulis (<span id="labelPanelSelectedPage">Hal 1</span>):</span>
+                <span id="labelPanelPageWriteCurrent" class="text-[10px] text-pink-400 font-mono font-bold">15s</span>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <button type="button" data-pwrite="5" class="page-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-pink-500">5s</button>
+                <button type="button" data-pwrite="10" class="page-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-pink-500">10s</button>
+                <button type="button" data-pwrite="15" class="page-write-btn active py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-pink-500">15s</button>
+                <button type="button" data-pwrite="20" class="page-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-pink-500">20s</button>
+                <button type="button" data-pwrite="30" class="page-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-pink-500">30s</button>
+              </div>
+            </div>
+
+            <!-- Jeda Baca Page Terpilih -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] text-slate-400">⏳ Jeda Baca (<span id="labelPanelSelectedPagePause">Hal 1</span>):</span>
+                <span id="labelPanelPagePauseCurrent" class="text-[10px] text-sky-400 font-mono font-bold">5s</span>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <button type="button" data-ppause="1" class="page-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-sky-500">1s</button>
+                <button type="button" data-ppause="2" class="page-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-sky-500">2s</button>
+                <button type="button" data-ppause="3" class="page-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-sky-500">3s</button>
+                <button type="button" data-ppause="5" class="page-pause-btn active py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-sky-500">5s</button>
+                <button type="button" data-ppause="8" class="page-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 transition-all hover:border-sky-500">8s</button>
+              </div>
+              <div class="text-[9px] text-slate-400 mt-1 italic">Waktu hening agar penonton membaca teks di halaman ini sebelum kebetan.</div>
             </div>
           </div>
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="text-[11px] text-slate-400">⏳ Jeda Baca Setelah Nulis (Waktu Pembaca)</label>
-              <span id="labelPauseCurrent" class="text-[10px] text-pink-400 font-mono font-bold">3.0 detik</span>
-            </div>
-            <div class="grid grid-cols-5 gap-1.5">
-              <button type="button" data-pause="1" class="pause-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">1s</button>
-              <button type="button" data-pause="2" class="pause-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">2s</button>
-              <button type="button" data-pause="3" class="pause-opt-btn active py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">3s</button>
-              <button type="button" data-pause="4" class="pause-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">4s</button>
-              <button type="button" data-pause="5" class="pause-opt-btn py-1.5 rounded-lg border border-slate-700 bg-[#141e33] text-xs font-semibold text-slate-300 transition-all hover:border-slate-500">5s</button>
-            </div>
-            <div class="text-[9px] text-slate-400 mt-1 italic">Memberikan waktu jeda tenang bagi penonton untuk membaca teks sebelum halaman dikebet.</div>
+
+          <!-- Total Duration Summary Banner -->
+          <div class="p-2.5 rounded-xl bg-pink-950/30 border border-pink-500/30 flex items-center justify-between text-xs">
+            <span class="text-slate-300">🎬 Total Durasi Video:</span>
+            <span id="labelTotalVideoDuration" class="font-bold text-pink-400 font-mono">15.0 detik</span>
           </div>
         </div>
 
@@ -442,6 +472,47 @@
           </div>
 
           <textarea id="fullActiveQuote" rows="9" placeholder="Tuliskan kata-kata mutiara, bab cerita, atau motivasi untuk lembaran halaman ini..." class="w-full bg-[#141e33] border border-slate-700 rounded-xl p-3.5 text-sm font-sans text-slate-100 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 leading-relaxed"></textarea>
+
+          <!-- PER-PAGE TIMING CONTROLS FOR ACTIVE PAGE -->
+          <div class="bg-[#141e33] border border-slate-700/80 rounded-xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-pink-300 flex items-center space-x-1">
+                <span>⏱️</span>
+                <span id="editorPageTimingTitle">Waktu Halaman 1</span>
+              </span>
+              <span id="editorPageTimingSummary" class="text-[10px] text-emerald-400 font-mono font-semibold">Total: 20s (15s nulis + 5s baca)</span>
+            </div>
+
+            <!-- Durasi Menulis Halaman Ini -->
+            <div>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                <span>Durasi Menulis Lembaran Ini:</span>
+                <span id="editorPageWriteBadge" class="text-pink-400 font-mono font-bold">15 detik</span>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <button type="button" data-pwrite="5" class="ed-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-pink-500">5s</button>
+                <button type="button" data-pwrite="10" class="ed-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-pink-500">10s</button>
+                <button type="button" data-pwrite="15" class="ed-write-btn active py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-pink-500">15s</button>
+                <button type="button" data-pwrite="20" class="ed-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-pink-500">20s</button>
+                <button type="button" data-pwrite="30" class="ed-write-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-pink-500">30s</button>
+              </div>
+            </div>
+
+            <!-- Jeda Baca Halaman Ini -->
+            <div>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                <span>⏳ Jeda Baca (Waktu Penonton Membaca):</span>
+                <span id="editorPagePauseBadge" class="text-sky-400 font-mono font-bold">5 detik</span>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <button type="button" data-ppause="1" class="ed-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-sky-500">1s</button>
+                <button type="button" data-ppause="2" class="ed-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-sky-500">2s</button>
+                <button type="button" data-ppause="3" class="ed-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-sky-500">3s</button>
+                <button type="button" data-ppause="5" class="ed-pause-btn active py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-sky-500">5s</button>
+                <button type="button" data-ppause="8" class="ed-pause-btn py-1 rounded-lg border border-slate-700 bg-[#0e172a] text-xs font-semibold text-slate-300 hover:border-sky-500">8s</button>
+              </div>
+            </div>
+          </div>
 
           <!-- Signature row (Optionally customizable) -->
           <div id="rowSignature">
