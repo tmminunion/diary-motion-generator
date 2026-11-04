@@ -491,16 +491,23 @@ function syncEditorState() {
   const curIdx = Math.max(0, Math.min(state.current_page_idx, N - 1));
   const curPage = state.pages[curIdx];
 
-  // Render Tabs in Editor Header
+  // Render Compact Aesthetic Tabs in Editor Header (Never Overflow / Wrap)
   editorTabsList.innerHTML = "";
   state.pages.forEach((p, idx) => {
     const tab = document.createElement("button");
     tab.type = "button";
     const isActive = idx === curIdx;
-    tab.className = `px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 ${
-      isActive ? "bg-pink-500 text-white shadow" : "text-slate-400 hover:text-white bg-[#141d33] border border-slate-700/60"
+    tab.className = `px-2.5 py-1 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center space-x-1 ${
+      isActive
+        ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/25 ring-1 ring-pink-400"
+        : "text-slate-400 hover:text-white bg-[#141d33] border border-slate-700/60"
     }`;
-    tab.textContent = `📄 Hal ${idx + 1}`;
+    if (isActive) {
+      tab.innerHTML = `<span>📄</span><span>Hal ${idx + 1}</span>`;
+    } else {
+      tab.innerHTML = `<span class="font-mono">${idx + 1}</span>`;
+      tab.title = `Buka Lembaran Halaman ${idx + 1}`;
+    }
     tab.addEventListener("click", () => {
       saveCurrentPageText();
       state.current_page_idx = idx;
@@ -659,6 +666,42 @@ function saveAndCloseScriptEditor() {
 // -----------------------------------------------------------------------------
 // AI Generator (Revai & agy -p Collaboration)
 // -----------------------------------------------------------------------------
+function wrapTextAuto(text, maxChars = 36) {
+  if (!text) return "";
+  const paras = String(text).split("\n");
+  const wrapped = [];
+  for (const p of paras) {
+    const trimmed = p.trim();
+    if (!trimmed) {
+      wrapped.push("");
+      continue;
+    }
+    const words = trimmed.split(/\s+/);
+    const lines = [];
+    let cur = [];
+    let curLen = 0;
+    for (const w of words) {
+      if (curLen + w.length + (cur.length ? 1 : 0) > maxChars) {
+        if (cur.length) {
+          lines.push(cur.join(" "));
+          cur = [w];
+          curLen = w.length;
+        } else {
+          lines.push(w);
+          cur = [];
+          curLen = 0;
+        }
+      } else {
+        cur.push(w);
+        curLen += w.length + (cur.length > 1 ? 1 : 0);
+      }
+    }
+    if (cur.length) lines.push(cur.join(" "));
+    wrapped.push(lines.join("\n"));
+  }
+  return wrapped.join("\n");
+}
+
 let isGeneratingAi = false;
 async function handleAiGenerate(promptOverride = null) {
   if (isGeneratingAi) return;
@@ -675,7 +718,7 @@ async function handleAiGenerate(promptOverride = null) {
   if (aiBtnText) aiBtnText.textContent = "Merangkai...";
   if (aiStatusBox) {
     aiStatusBox.classList.remove("hidden");
-    if (aiStatusText) aiStatusText.textContent = `Revai sedang merangkai kata manis untuk Aa... 💖`;
+    if (aiStatusText) aiStatusText.textContent = `Revai sedang merangkai kata manis untuk Hal ${state.current_page_idx + 1}... 💖`;
   }
 
   try {
@@ -687,20 +730,30 @@ async function handleAiGenerate(promptOverride = null) {
     const result = await res.json();
     if (result.status === "success" && result.data) {
       const d = result.data;
-      if (d.title) state.title = d.title;
-      state.pages = [];
-      if (d.page1) state.pages.push({ id: 1, quote: d.page1, sign: "" });
-      if (d.page2) state.pages.push({ id: 2, quote: d.page2, sign: d.sign || "— Revai 💖" });
-      if (state.pages.length === 0) {
-        state.pages.push({ id: 1, quote: prompt, sign: "— Revai 💖" });
+      const targetIdx = Math.max(0, Math.min(state.current_page_idx, state.pages.length - 1));
+
+      // Choose text from AI: quote, page1, or raw prompt
+      const rawText = d.quote || d.page1 || prompt;
+      const wrappedText = wrapTextAuto(rawText, 36);
+
+      // Inject specifically into the active page! Never overwrite or reset other pages!
+      state.pages[targetIdx].quote = wrappedText;
+      if (d.sign && targetIdx === state.pages.length - 1) {
+        state.pages[targetIdx].sign = d.sign;
+      }
+      if (d.title && (state.title.includes("Pengingat Diri") || state.title.trim() === "")) {
+        state.title = d.title;
+        if (fullInputTitle) fullInputTitle.value = d.title;
       }
 
-      state.current_page_idx = 0;
+      fullActiveQuote.value = wrappedText;
+      activeCharCount.textContent = `${wrappedText.length} kar`;
+
       calculateAndSyncDuration();
       renderTimelineScenes();
       syncEditorState();
       renderCanvas();
-      showToast("✨ Naskah Tercipta!", "Kata-kata indah dari Revai sudah masuk ke naskah Aa! 💖");
+      showToast("✨ Naskah Tercipta!", `Inspirasi berhasil dirangkai untuk Halaman ${targetIdx + 1}! 💖`);
     } else {
       showToast("⚠️ Perhatian", result.message || "Gagal membuat naskah.");
     }
@@ -1030,6 +1083,52 @@ function setupEventListeners() {
     });
   });
 
+  // Font Size Steppers & Presets
+  const btnFontDec = document.getElementById("btnFontDec");
+  const btnFontInc = document.getElementById("btnFontInc");
+  if (btnFontDec) {
+    btnFontDec.addEventListener("click", () => {
+      const cur = state.font_size || 46;
+      updateFontSizeUI(Math.max(28, cur - 2));
+    });
+  }
+  if (btnFontInc) {
+    btnFontInc.addEventListener("click", () => {
+      const cur = state.font_size || 46;
+      updateFontSizeUI(Math.min(72, cur + 2));
+    });
+  }
+  document.querySelectorAll(".fsize-opt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sz = parseInt(btn.getAttribute("data-fsize"));
+      updateFontSizeUI(sz);
+    });
+  });
+
+  // SQLite Projects & History Modals
+  const btnOpenProjectsModal = document.getElementById("btnOpenProjectsModal");
+  if (btnOpenProjectsModal) btnOpenProjectsModal.addEventListener("click", openProjectsModal);
+
+  const btnCloseProjectsModal = document.getElementById("btnCloseProjectsModal");
+  if (btnCloseProjectsModal) btnCloseProjectsModal.addEventListener("click", closeProjectsModal);
+
+  const btnSaveProjectQuick = document.getElementById("btnSaveProjectQuick");
+  if (btnSaveProjectQuick) btnSaveProjectQuick.addEventListener("click", saveCurrentProjectToDb);
+
+  const btnSaveCurrentProjectToDb = document.getElementById("btnSaveCurrentProjectToDb");
+  if (btnSaveCurrentProjectToDb) btnSaveCurrentProjectToDb.addEventListener("click", saveCurrentProjectToDb);
+
+  const btnCreateNewProject = document.getElementById("btnCreateNewProject");
+  if (btnCreateNewProject) btnCreateNewProject.addEventListener("click", createNewBlankProject);
+
+  // Keyboard shortcut Ctrl+S / Cmd+S for instant saving to SQLite
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      saveCurrentProjectToDb();
+    }
+  });
+
   btnTriggerRenderVideo.addEventListener("click", () => triggerVideoRender(false));
   btnTriggerRenderAndSendTg.addEventListener("click", () => triggerVideoRender(true));
   btnTriggerDownloadImage.addEventListener("click", triggerDownloadStill);
@@ -1040,11 +1139,226 @@ function setupEventListeners() {
 function updateFontUI(f) {
   document.querySelectorAll(".font-opt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-font") === f));
 }
+function updateFontSizeUI(sz) {
+  state.font_size = sz;
+  state.line_spacing = Math.round(sz * 1.22);
+  const lbl = document.getElementById("labelFontSizeDisplay");
+  if (lbl) lbl.textContent = `${sz} px`;
+  document.querySelectorAll(".fsize-opt-btn").forEach(b => {
+    b.classList.toggle("active", parseInt(b.getAttribute("data-fsize")) === sz);
+  });
+  renderCanvas();
+}
 function updatePaperUI(p) {
   document.querySelectorAll(".paper-opt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-paper") === p));
 }
 function updateInkUI(ink) {
   document.querySelectorAll(".ink-opt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-ink") === ink));
+}
+
+// -----------------------------------------------------------------------------
+// SQLite Database Projects & History Manager
+// -----------------------------------------------------------------------------
+async function openProjectsModal() {
+  closeToolDrawer();
+  const modal = document.getElementById("modalProjects");
+  if (modal) modal.classList.remove("hidden");
+  await renderProjectsModalList();
+}
+
+function closeProjectsModal() {
+  const modal = document.getElementById("modalProjects");
+  if (modal) modal.classList.add("hidden");
+}
+
+async function renderProjectsModalList() {
+  const container = document.getElementById("projectsListContainer");
+  if (!container) return;
+  container.innerHTML = `<div class="text-xs text-slate-400 py-4 text-center">Memuat histori proyek dari database SQLite...</div>`;
+
+  try {
+    const res = await fetch("/api/projects");
+    const json = await res.json();
+    if (json.status === "success" && json.projects) {
+      if (json.projects.length === 0) {
+        container.innerHTML = `
+          <div class="p-6 text-center text-slate-400 text-xs bg-[#101726] rounded-2xl border border-slate-800">
+            <div class="text-2xl mb-1.5">📖</div>
+            <div class="font-bold text-slate-200">Belum Ada Proyek Tersimpan</div>
+            <div class="text-[10px] text-slate-500 mt-1">Klik tombol "💾 Simpan Draft Ini" untuk menyimpan karya Aa ke database SQLite.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = "";
+      json.projects.forEach(p => {
+        const card = document.createElement("div");
+        card.className = "p-3 rounded-2xl border border-slate-700 bg-[#141e33] hover:border-pink-500/50 transition-all flex flex-col space-y-2";
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="pr-2">
+              <div class="text-xs font-bold text-pink-300 line-clamp-1">${p.title || "Catatan Tanpa Judul"}</div>
+              <div class="text-[10px] text-slate-400 font-mono mt-0.5">${p.date_text || ""} • ${p.total_pages} Hal • ${(p.duration || 15).toFixed(0)}s</div>
+            </div>
+            <div class="flex items-center space-x-1.5 shrink-0">
+              <button type="button" class="btn-load-proj px-2.5 py-1 rounded-lg bg-pink-500 hover:bg-pink-400 text-slate-950 font-bold text-xs active:scale-95 transition-all">
+                Buka
+              </button>
+              <button type="button" class="btn-del-proj px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs active:scale-95 transition-all" title="Hapus dari database">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-400 italic line-clamp-2 bg-[#0c1220] p-1.5 rounded-lg border border-slate-800/80">
+            "${p.preview_text || "..."}"
+          </div>
+        `;
+
+        card.querySelector(".btn-load-proj").addEventListener("click", () => loadProjectFromDb(p.id));
+        card.querySelector(".btn-del-proj").addEventListener("click", () => deleteProjectFromDb(p.id));
+        container.appendChild(card);
+      });
+    } else {
+      container.innerHTML = `<div class="text-xs text-rose-400 py-3 text-center">Gagal memuat proyek.</div>`;
+    }
+  } catch (err) {
+    console.error("Load projects error:", err);
+    container.innerHTML = `<div class="text-xs text-rose-400 py-3 text-center">Gagal menghubungi database SQLite.</div>`;
+  }
+}
+
+async function saveCurrentProjectToDb() {
+  saveCurrentPageText();
+  const payload = {
+    id: state.project_id || null,
+    title: state.title,
+    date_text: state.date_text,
+    pages: state.pages,
+    font_name: state.font_name,
+    font_size: state.font_size,
+    line_spacing: state.line_spacing,
+    paper_style: state.paper_style,
+    ink_color: state.ink_color,
+    bg_scene: state.bg_scene,
+    duration: state.duration,
+    pause_duration: state.pause_duration,
+    audio_file: state.audio_file,
+    watermark: state.watermark,
+    overlays: state.overlays
+  };
+
+  try {
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      state.project_id = json.id;
+      showToast("💾 Proyek Tersimpan!", `Proyek "${state.title}" berhasil disimpan ke SQLite!`);
+      const modal = document.getElementById("modalProjects");
+      if (modal && !modal.classList.contains("hidden")) {
+        renderProjectsModalList();
+      }
+    } else {
+      showToast("⚠️ Gagal Simpan", json.message || "Gagal menyimpan ke database.");
+    }
+  } catch (e) {
+    console.error("Save project error:", e);
+    showToast("⚠️ Error Database", "Tidak dapat menghubungi database SQLite.");
+  }
+}
+
+async function loadProjectFromDb(id) {
+  try {
+    const res = await fetch(`/api/projects/${id}`);
+    const json = await res.json();
+    if (json.status === "success" && json.project && json.project.data) {
+      const d = json.project.data;
+      state.project_id = json.project.id;
+      if (d.title) state.title = d.title;
+      if (d.date_text) state.date_text = d.date_text;
+      if (d.pages && Array.isArray(d.pages)) state.pages = d.pages;
+      if (d.font_name) state.font_name = d.font_name;
+      if (d.font_size) state.font_size = d.font_size;
+      if (d.line_spacing) state.line_spacing = d.line_spacing;
+      if (d.paper_style) state.paper_style = d.paper_style;
+      if (d.ink_color) state.ink_color = d.ink_color;
+      if (d.bg_scene) state.bg_scene = d.bg_scene;
+      if (d.audio_file) state.audio_file = d.audio_file;
+      if (d.watermark) state.watermark = d.watermark;
+      if (d.overlays) state.overlays = d.overlays;
+
+      state.current_page_idx = 0;
+      selectedPanelTimingIdx = 0;
+
+      calculateAndSyncDuration();
+      renderTimelineScenes();
+      syncEditorState();
+      syncPanelAudioTiming();
+
+      updateFontUI(state.font_name);
+      updateFontSizeUI(state.font_size || 46);
+      updatePaperUI(state.paper_style);
+      updateInkUI(state.ink_color);
+      updateBadges();
+
+      closeProjectsModal();
+      showToast("📖 Proyek Dimuat", `Proyek "${state.title}" berhasil dibuka!`);
+      seekTo(0);
+      renderCanvas();
+    }
+  } catch (e) {
+    console.error("Load project error:", e);
+    showToast("⚠️ Error", "Gagal memuat data proyek.");
+  }
+}
+
+async function deleteProjectFromDb(id) {
+  try {
+    const res = await fetch("/api/projects/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      if (state.project_id === id) state.project_id = null;
+      showToast("🗑️ Proyek Dihapus", "Data draft telah dihapus dari database SQLite.");
+      renderProjectsModalList();
+    }
+  } catch (e) {
+    console.error("Delete project error:", e);
+  }
+}
+
+function createNewBlankProject() {
+  state.project_id = null;
+  state.title = "🌿 Catatan Baru";
+  state.date_text = "Hari Ini";
+  state.pages = [
+    {
+      id: 1,
+      quote: "",
+      sign: "— Revai 💖",
+      duration: 15,
+      pause_duration: 5
+    }
+  ];
+  state.current_page_idx = 0;
+  selectedPanelTimingIdx = 0;
+
+  calculateAndSyncDuration();
+  renderTimelineScenes();
+  syncEditorState();
+  syncPanelAudioTiming();
+  updateBadges();
+
+  closeProjectsModal();
+  showToast("📄 Lembaran Baru", "Proyek baru siap ditulis!");
+  openFullScriptEditor(0);
 }
 function updateDurationUI(d) {
   document.querySelectorAll(".dur-opt-btn").forEach(b => b.classList.toggle("active", parseInt(b.getAttribute("data-duration")) === d));

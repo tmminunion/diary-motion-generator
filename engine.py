@@ -228,10 +228,38 @@ def draw_text_on_page(base_img, config, quote_lines, start_x, start_y, line_spac
 
 def parse_quote_input(quote_input):
     if isinstance(quote_input, list):
-        return quote_input
-    if isinstance(quote_input, str):
-        return [l.strip() for l in quote_input.strip().split("\n")]
-    return ["Jangan pernah lelah berproses, Aa."]
+        raw_lines = quote_input
+    elif isinstance(quote_input, str):
+        raw_lines = quote_input.strip().split("\n")
+    else:
+        raw_lines = ["Jangan pernah lelah berproses, Aa."]
+
+    # Auto word-wrap any line that exceeds ~36-38 chars so text never overlaps paper edges!
+    wrapped_lines = []
+    for line in raw_lines:
+        line = str(line).strip()
+        if not line:
+            wrapped_lines.append("")
+            continue
+        words = line.split()
+        cur = []
+        cur_len = 0
+        for w in words:
+            if cur_len + len(w) + (1 if cur else 0) > 36:
+                if cur:
+                    wrapped_lines.append(" ".join(cur))
+                    cur = [w]
+                    cur_len = len(w)
+                else:
+                    wrapped_lines.append(w)
+                    cur = []
+                    cur_len = 0
+            else:
+                cur.append(w)
+                cur_len += len(w) + (1 if len(cur) > 1 else 0)
+        if cur:
+            wrapped_lines.append(" ".join(cur))
+    return wrapped_lines
 
 def get_normalized_pages(config):
     """

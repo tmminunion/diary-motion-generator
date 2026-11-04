@@ -101,15 +101,15 @@
 }
 
 /* Base and Active Options */
-.bg-opt-btn, .font-opt-btn, .paper-opt-btn, .dur-opt-btn, .pause-opt-btn, .stamp-opt-btn, .tape-opt-btn, .photo-opt-btn, .filter-opt-btn, #btnOptSinglePage, #btnOptDoublePage {
+.bg-opt-btn, .font-opt-btn, .fsize-opt-btn, .paper-opt-btn, .dur-opt-btn, .pause-opt-btn, .stamp-opt-btn, .tape-opt-btn, .photo-opt-btn, .filter-opt-btn {
   transition: all 0.15s ease;
 }
-.bg-opt-btn .opt-title, .font-opt-btn .opt-title, .stamp-opt-btn .opt-title, .tape-opt-btn .opt-title, .photo-opt-btn .opt-title, .filter-opt-btn .opt-title, #btnOptSinglePage .opt-title, #btnOptDoublePage .opt-title {
+.bg-opt-btn .opt-title, .font-opt-btn .opt-title, .stamp-opt-btn .opt-title, .tape-opt-btn .opt-title, .photo-opt-btn .opt-title, .filter-opt-btn .opt-title {
   color: #cbd5e1;
   transition: color 0.15s ease;
 }
 
-.bg-opt-btn.active, .font-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .pause-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, #btnOptSinglePage.active, #btnOptDoublePage.active, .page-write-btn.active, .ed-write-btn.active {
+.bg-opt-btn.active, .font-opt-btn.active, .fsize-opt-btn.active, .paper-opt-btn.active, .dur-opt-btn.active, .pause-opt-btn.active, .stamp-opt-btn.active, .tape-opt-btn.active, .photo-opt-btn.active, .filter-opt-btn.active, .page-write-btn.active, .ed-write-btn.active {
   border-color: rgba(236, 72, 153, 0.9) !important;
   background-color: rgba(236, 72, 153, 0.22) !important;
   color: #f472b6 !important;
@@ -122,7 +122,7 @@
   color: #38bdf8 !important;
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
 }
-.bg-opt-btn.active .opt-title, .font-opt-btn.active .opt-title, .stamp-opt-btn.active .opt-title, .tape-opt-btn.active .opt-title, .photo-opt-btn.active .opt-title, .filter-opt-btn.active .opt-title, #btnOptSinglePage.active .opt-title, #btnOptDoublePage.active .opt-title {
+.bg-opt-btn.active .opt-title, .font-opt-btn.active .opt-title, .stamp-opt-btn.active .opt-title, .tape-opt-btn.active .opt-title, .photo-opt-btn.active .opt-title, .filter-opt-btn.active .opt-title {
   color: #f472b6 !important;
 }
 

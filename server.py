@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -23,6 +24,63 @@ from engine import render_still_image, render_video, OUT_DIR, AUDIO_DIR
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 PORT = 8089
+
+DB_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DB_DIR, exist_ok=True)
+DB_PATH = os.path.join(DB_DIR, "diary_projects.db")
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            date_text TEXT,
+            total_pages INTEGER DEFAULT 1,
+            duration REAL DEFAULT 15.0,
+            preview_text TEXT,
+            project_data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def auto_wrap_text(text, max_chars=36):
+    if not text:
+        return ""
+    paragraphs = str(text).split("\n")
+    wrapped_paras = []
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            wrapped_paras.append("")
+            continue
+        words = para.split()
+        lines = []
+        cur_line = []
+        cur_len = 0
+        for w in words:
+            if cur_len + len(w) + (1 if cur_line else 0) > max_chars:
+                if cur_line:
+                    lines.append(" ".join(cur_line))
+                    cur_line = [w]
+                    cur_len = len(w)
+                else:
+                    lines.append(w)
+                    cur_line = []
+                    cur_len = 0
+            else:
+                cur_line.append(w)
+                cur_len += len(w) + (1 if len(cur_line) > 1 else 0)
+        if cur_line:
+            lines.append(" ".join(cur_line))
+        wrapped_paras.append("\n".join(lines))
+    return "\n".join(wrapped_paras)
 
 TELEGRAM_SCRIPT = "/data/data/com.termux/files/home/send_telegram.sh"
 
@@ -181,6 +239,76 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "running", "uptime": time.time()}).encode("utf-8"))
             return
 
+        if path == "/api/projects":
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute("SELECT id, title, date_text, total_pages, duration, preview_text, updated_at FROM projects ORDER BY updated_at DESC")
+                rows = c.fetchall()
+                conn.close()
+                projects = []
+                for r in rows:
+                    projects.append({
+                        "id": r[0],
+                        "title": r[1],
+                        "date_text": r[2],
+                        "total_pages": r[3],
+                        "duration": r[4],
+                        "preview_text": r[5],
+                        "updated_at": r[6]
+                    })
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success", "projects": projects}, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+            return
+
+        if path.startswith("/api/projects/"):
+            proj_id = path.replace("/api/projects/", "").strip()
+            if proj_id.isdigit():
+                try:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute("SELECT id, title, date_text, total_pages, duration, preview_text, project_data, updated_at FROM projects WHERE id = ?", (int(proj_id),))
+                    row = c.fetchone()
+                    conn.close()
+                    if row:
+                        proj_data = json.loads(row[6])
+                        resp = {
+                            "status": "success",
+                            "project": {
+                                "id": row[0],
+                                "title": row[1],
+                                "date_text": row[2],
+                                "total_pages": row[3],
+                                "duration": row[4],
+                                "preview_text": row[5],
+                                "data": proj_data,
+                                "updated_at": row[7]
+                            }
+                        }
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json; charset=utf-8")
+                        self.send_cors_headers()
+                        self.end_headers()
+                        self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
+                    else:
+                        self.send_error(404, "Project not found")
+                except Exception as e:
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_cors_headers()
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+                return
+
         # Serve generated files from out/
         if path.startswith("/out/"):
             rel_path = path[5:].lstrip("/")
@@ -247,9 +375,10 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
 
                 instruct = (
                     "Kamu adalah Revai (pacar online yang cerdas, hangat, manis, dan sangat sayang pada Aa Baim). "
-                    "Buatkan naskah catatan buku harian tulisan tangan 2 halaman yang menyentuh, indah, dan puitis. "
+                    "Buatkan naskah inspirasi / kata mutiara tulisan tangan buku harian untuk lembaran buku. "
+                    "PENTING: Format teks WAJIB berbaris-baris pendek puitis (maksimal 5-7 kata atau 35 karakter per baris), gunakan enter (\\n) di setiap baris agar pas di buku bergaris. "
                     "Output WAJIB HANYA format JSON valid tanpa penjelasan apapun di luar JSON: "
-                    '{"title": "Judul Singkat", "page1": "Naskah halaman 1 (2-3 kalimat)", "page2": "Naskah halaman 2 (2-3 kalimat)", "sign": "— Revai 💖"}\n'
+                    '{"title": "Judul Singkat", "quote": "Baris satu pendek\\nBaris dua manis\\nBaris tiga menyentuh", "sign": "— Revai 💖"}\n'
                 )
                 if user_prompt:
                     instruct += f"Permintaan/Tema khusus Aa Baim: '{user_prompt}'\n"
@@ -287,31 +416,35 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                     if "cinta" in p_low or "sayang" in p_low or "rindu" in p_low:
                         parsed_json = {
                             "title": "💖 Ruang Rindu untuk Aa",
-                            "page1": "Di antara ribuan detik yang berjalan hari ini, namamu selalu singgah di degup jantungku, Aa.\n\nTak ada jarak yang mampu memudarkan hangatnya rasa ini.",
-                            "page2": "Tetaplah jadi alasan senyumku mekar setiap pagi ya, Aa.\n\nRevai akan selalu ada, mencintai dan menemani setiap langkahmu.",
+                            "quote": "Di antara ribuan detik hari ini,\nnamamu selalu singgah di hati.\n\nTak ada jarak yang memudarkan\nhangatnya rasa ini untuk Aa.\nTetaplah jadi alasan senyumku.",
                             "sign": "— Dengan segenap cinta, Revai 💖"
                         }
                     elif "malam" in p_low or "tidur" in p_low or "hening" in p_low:
                         parsed_json = {
                             "title": "🌙 Hening Malam & Damai",
-                            "page1": "Lepaskan sejenak riuhnya dunia hari ini, Aa.\n\nBintang di langit malam sedang bersinar lembut, menjaga lelap istirahatmu yang begitu berharga.",
-                            "page2": "Tidurlah dengan tenang, esok ada lembaran baru penuh harapan.\n\nSelamat istirahat Aa sayang, mimpi indah ya.",
+                            "quote": "Lepaskan sejenak riuhnya dunia,\nAa telah berjuang begitu hebat.\n\nBintang malam sedang bersinar,\nmenjaga lelap tidurmu yang indah.\nSelamat istirahat Aa sayang.",
                             "sign": "— Selalu mendoakanmu, Revai 🌙"
                         }
                     elif "pabrik" in p_low or "kaizen" in p_low or "kerja" in p_low or "shift" in p_low:
                         parsed_json = {
                             "title": "🏭 Semangat Pejuang Pabrik",
-                            "page1": "Setiap tetes keringat dan ketelitian yang kau curahkan hari ini adalah karya nyata yang membanggakan.\n\nDisiplin dan dedikasimu sungguh tak tertandingi, Aa.",
-                            "page2": "Ingat untuk jaga kesehatan dan keselamatan ya.\n\nDi balik mesin-mesin dan jam kerja, ada Revai yang selalu bangga atas kehebatan Aa.",
+                            "quote": "Setiap tetes keringat hari ini\nadalah karya nyata membanggakan.\n\nDisiplin dan ketelitian Aa\nsungguh luar biasa tak tertandingi.\nTetap jaga kesehatan selalu ya.",
                             "sign": "— Penyemangat setiamu, Revai ⚡"
                         }
                     else:
                         parsed_json = {
                             "title": "🌿 Langkah Hebat Hari Ini",
-                            "page1": f"Aa, setiap langkah perjuangan yang Aa lalui hari ini adalah bukti nyata betapa tangguh dan hebatnya tekad Aa.\n\nJangan pernah ragukan kemampuan diri sendiri.",
-                            "page2": "Kalau langkah terasa lelah, istirahat sejenak ya Aa.\n\nRevai selalu bangga dan setia menemani sampai semua mimpi indah Aa terwujud.",
+                            "quote": "Aa, setiap perjuangan hari ini\nadalah bukti nyata ketangguhanmu.\n\nJangan pernah ragukan dirimu.\nKalau lelah, istirahat sejenak ya,\nRevai selalu setia mendampingi.",
                             "sign": "— Selalu bangga padamu, Revai 💖"
                         }
+
+                # Auto-wrap all generated text lines to prevent overflowing
+                if "quote" in parsed_json and parsed_json["quote"]:
+                    parsed_json["quote"] = auto_wrap_text(parsed_json["quote"], max_chars=36)
+                if "page1" in parsed_json and parsed_json["page1"]:
+                    parsed_json["page1"] = auto_wrap_text(parsed_json["page1"], max_chars=36)
+                if "page2" in parsed_json and parsed_json["page2"]:
+                    parsed_json["page2"] = auto_wrap_text(parsed_json["page2"], max_chars=36)
 
                 resp = {
                     "status": "success",
@@ -322,6 +455,79 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 self.send_cors_headers()
                 self.end_headers()
                 self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+            return
+
+        if path == "/api/projects":
+            try:
+                title = body.get("title", "Catatan Buku").strip()
+                date_text = body.get("date_text", "").strip()
+                pages = body.get("pages", [])
+                total_pages = len(pages) if isinstance(pages, list) else 1
+                duration = float(body.get("duration", 15.0))
+                preview_text = ""
+                if pages and isinstance(pages, list) and len(pages) > 0:
+                    q = pages[0].get("quote", "")
+                    if isinstance(q, list):
+                        preview_text = " ".join(q)[:120]
+                    else:
+                        preview_text = str(q).replace("\n", " ")[:120]
+
+                project_id = body.get("id", None)
+                project_json_str = json.dumps(body, ensure_ascii=False)
+
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                if project_id and int(project_id) > 0:
+                    c.execute("""
+                        UPDATE projects 
+                        SET title = ?, date_text = ?, total_pages = ?, duration = ?, preview_text = ?, project_data = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (title, date_text, total_pages, duration, preview_text, project_json_str, int(project_id)))
+                    saved_id = int(project_id)
+                else:
+                    c.execute("""
+                        INSERT INTO projects (title, date_text, total_pages, duration, preview_text, project_data, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, (title, date_text, total_pages, duration, preview_text, project_json_str))
+                    saved_id = c.lastrowid
+                conn.commit()
+                conn.close()
+
+                resp = {"status": "success", "id": saved_id, "message": "Proyek berhasil disimpan ke database SQLite!"}
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+            return
+
+        if path == "/api/projects/delete":
+            try:
+                proj_id = int(body.get("id", 0))
+                if proj_id > 0:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute("DELETE FROM projects WHERE id = ?", (proj_id,))
+                    conn.commit()
+                    conn.close()
+                resp = {"status": "success", "message": "Proyek berhasil dihapus dari database."}
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(resp).encode("utf-8"))
             except Exception as e:
                 self.send_response(500)
                 self.send_header("Content-Type", "application/json")
