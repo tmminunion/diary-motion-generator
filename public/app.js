@@ -114,7 +114,6 @@ const drawerBackdrop = document.getElementById("drawerBackdrop");
 const drawerTitle = document.getElementById("drawerTitle");
 const btnCloseDrawer = document.getElementById("btnCloseDrawer");
 
-const panelPages = document.getElementById("panelPages");
 const panelScene = document.getElementById("panelScene");
 const panelStyle = document.getElementById("panelStyle");
 const panelOverlay = document.getElementById("panelOverlay");
@@ -468,11 +467,6 @@ function deletePage(idx) {
   renderTimelineScenes();
   syncEditorState();
   syncPanelAudioTiming();
-  updateBadges();
-  showToast("🗑️ Halaman Dihapus", "Halaman berhasil dihapus.");
-  seekTo(0);
-  renderCanvas();
-}
   updateBadges();
   showToast("🗑️ Halaman Dihapus", "Halaman berhasil dihapus.");
   seekTo(0);
