@@ -30,7 +30,10 @@ export type SceneType =
   | "timeline_story"
   | "qna_card"
   | "receipt_struk"
-  | "poll_versus";
+  | "poll_versus"
+  | "hud_scanner"
+  | "glass_aurora"
+  | "ai_prompt";
 
 export interface SceneData {
   id: string;
@@ -74,7 +77,10 @@ export type TemplateId =
   | "timeline_story"
   | "qna_card"
   | "receipt_struk"
-  | "poll_versus";
+  | "poll_versus"
+  | "hud_scanner"
+  | "glass_aurora"
+  | "ai_prompt";
 
 export interface TemplateDefinition {
   id: TemplateId;

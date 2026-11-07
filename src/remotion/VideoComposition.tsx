@@ -25,6 +25,9 @@ import { TimelineStoryScene } from "./templates/TimelineStoryScene";
 import { QnaCardScene } from "./templates/QnaCardScene";
 import { ReceiptStrukScene } from "./templates/ReceiptStrukScene";
 import { PollVersusScene } from "./templates/PollVersusScene";
+import { HudScannerScene } from "./templates/HudScannerScene";
+import { GlassAuroraScene } from "./templates/GlassAuroraScene";
+import { AiPromptScene } from "./templates/AiPromptScene";
 import { TEMPLATE_DEFAULT_TYPE } from "./templates/sceneTypes";
 import { getTransitionPresentation, getTransitionTiming } from "./transitions/TransitionRenderer";
 import { ensureFonts } from "./fonts";
@@ -51,6 +54,9 @@ const SIMPLE_SCENES: Partial<
   qna_card: QnaCardScene,
   receipt_struk: ReceiptStrukScene,
   poll_versus: PollVersusScene,
+  hud_scanner: HudScannerScene,
+  glass_aurora: GlassAuroraScene,
+  ai_prompt: AiPromptScene,
 };
 
 export const VideoComposition: React.FC<VideoProjectState> = ({

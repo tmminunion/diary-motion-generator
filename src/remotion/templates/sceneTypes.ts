@@ -28,4 +28,7 @@ export const TEMPLATE_DEFAULT_TYPE: Record<TemplateId, SceneType> = {
   qna_card: "qna_card",
   receipt_struk: "receipt_struk",
   poll_versus: "poll_versus",
+  hud_scanner: "hud_scanner",
+  glass_aurora: "glass_aurora",
+  ai_prompt: "ai_prompt",
 };
