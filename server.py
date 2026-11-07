@@ -510,6 +510,65 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         self.do_GET()
 
+    def _stream_render_job(self, project, chat_id, job_id, bot_token):
+        """Respons NDJSON di request yang SAMA: baris 'progress' selama render, lalu satu baris 'result'/'error'.
+        Cloud Run diset concurrency=1, jadi request lain (polling) tidak bisa menjangkau instance ini."""
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_cors_headers()
+        self.end_headers()
+
+        box = {}
+
+        def work():
+            try:
+                box["result"] = process_olip_render_job(project, chat_id, job_id, bot_token=bot_token)
+            except Exception as e:
+                box["error"] = str(e)
+
+        t = threading.Thread(target=work, daemon=True)
+        t.start()
+
+        state = {"alive": True}
+
+        def emit(obj):
+            if not state["alive"]:
+                return
+            try:
+                self.wfile.write((json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8"))
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                # Browser putus: render tetap dilanjutkan di thread, hasil tetap dikirim ke Telegram.
+                state["alive"] = False
+
+        emit({"type": "progress", "progress": 1, "stage": "Tugas diterima Cloud Run Jakarta", "jobId": job_id})
+        last = None
+        last_emit = time.time()
+        while t.is_alive():
+            t.join(timeout=1.0)
+            job = job_get(job_id) or {}
+            snap = (job.get("progress"), job.get("stage"))
+            if snap != last:
+                last = snap
+                last_emit = time.time()
+                emit({"type": "progress", "progress": job.get("progress", 0), "stage": job.get("stage", ""), "jobId": job_id})
+            elif time.time() - last_emit > 10:
+                last_emit = time.time()
+                emit({"type": "ping"})
+
+        if "result" in box:
+            r = box["result"]
+            emit({
+                "type": "result", "success": True, "jobId": job_id, "status": "completed",
+                "file": r.get("file"), "sizeMb": r.get("sizeMb"), "engine": r.get("engine"),
+                "fallback": "FFmpeg" in str(r.get("engine", "")),
+                "message": "Video MP4 berhasil dirender di Cloud Run Jakarta dan sudah dikirim ke Telegram Aa Baim! 🚀✨",
+            })
+        else:
+            emit({"type": "error", "jobId": job_id, "message": box.get("error", "Render gagal tanpa pesan error")})
+
     def send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -876,6 +935,9 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 client_job_id = str(body.get("jobId") or "")
                 job_id = client_job_id if JOB_ID_RE.match(client_job_id) else f"job_{int(time.time()*1000)}"
                 bot_token = body.get("botToken") or body.get("bot_token")
+                if body.get("stream"):
+                    self._stream_render_job(project, chat_id, job_id, bot_token)
+                    return
                 # Run synchronously to ensure Cloud Run maintains 100% active CPU!
                 result = process_olip_render_job(project, chat_id, job_id, bot_token=bot_token)
 
