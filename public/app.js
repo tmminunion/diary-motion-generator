@@ -504,7 +504,7 @@ function syncEditorState() {
   });
 
   // Active page card elements
-  activePageTitleBadge.textContent = `Lembaran Halaman ${curIdx + 1} dari ${N}`;
+  activePageTitleBadge.textContent = `page ${curIdx + 1} / ${N}`;
   fullActiveQuote.value = curPage.quote || "";
   activeCharCount.textContent = `${(curPage.quote || "").length} kar`;
 

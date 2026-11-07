@@ -17,3 +17,7 @@ data/*.db
 # OS files
 .DS_Store
 Thumbs.db
+
+# Backups & legacy
+*.bak*
+public/engine_old.py

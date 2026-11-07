@@ -10,6 +10,7 @@ Diary Motion Generator - Core Engine v2.1 (Turbo Optimized)
 
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -52,6 +53,119 @@ def get_font(name_or_key, size):
     if not os.path.exists(font_path):
         font_path = FONT_MAP["caveat"]
     return ImageFont.truetype(font_path, size)
+
+# ---------------------------------------------------------------------------
+# EMOJI SUPPORT
+# Font tulisan tangan (Caveat/Kalam/Patrick Hand) tidak punya glyph emoji, sehingga
+# emoji tampil sebagai kotak. Solusi: teks dipecah jadi segmen biasa + segmen emoji;
+# emoji ditempel sebagai gambar PNG berwarna (Twemoji) dari cache assets/emoji/.
+# Jika gambar emoji tidak tersedia, emoji dilewati (tidak ada kotak).
+# ---------------------------------------------------------------------------
+EMOJI_DIR = os.path.join(BASE_DIR, "assets", "emoji")
+TWEMOJI_CDN = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/72x72/{}.png"
+
+_EMOJI_RE = re.compile(
+    "(?:[\U0001F1E6-\U0001F1FF]{2}"
+    "|[0-9#*]\uFE0F?\u20E3"
+    "|(?:[\U0001F300-\U0001FAFF\u2600-\u2604\u2607-\u27BF\u2B50\u2B55\u2B1B\u2B1C"
+    "\u231A\u231B\u23E9-\u23F3\u23F8-\u23FA\u203C\u2049\u24C2\u25AA\u25AB\u25B6\u25C0"
+    "\u25FB-\u25FE\u2934\u2935\u3030\u303D\u3297\u3299]"
+    "\uFE0F?[\U0001F3FB-\U0001F3FF]?"
+    "(?:\u200D[\U0001F300-\U0001FAFF\u2600-\u27BF]\uFE0F?[\U0001F3FB-\U0001F3FF]?)*))"
+)
+
+_emoji_raw_cache = {}
+_emoji_sprite_cache = {}
+
+def _emoji_key(cluster):
+    cps = [ord(c) for c in cluster]
+    if 0x200D not in cps:
+        cps = [c for c in cps if c != 0xFE0F]
+    return "-".join(f"{c:x}" for c in cps)
+
+def _load_emoji(cluster):
+    key = _emoji_key(cluster)
+    if key in _emoji_raw_cache:
+        return _emoji_raw_cache[key]
+    path = os.path.join(EMOJI_DIR, key + ".png")
+    if not os.path.exists(path):
+        try:
+            import urllib.request
+            os.makedirs(EMOJI_DIR, exist_ok=True)
+            with urllib.request.urlopen(TWEMOJI_CDN.format(key), timeout=6) as r:
+                data = r.read()
+            with open(path, "wb") as f:
+                f.write(data)
+        except Exception:
+            pass
+    img = None
+    if os.path.exists(path):
+        try:
+            img = Image.open(path).convert("RGBA")
+        except Exception:
+            img = None
+    _emoji_raw_cache[key] = img
+    return img
+
+def _emoji_px(font):
+    return max(12, int(getattr(font, "size", 40) * 0.95))
+
+def _emoji_sprite(cluster, px):
+    k = (cluster, px)
+    if k not in _emoji_sprite_cache:
+        base = _load_emoji(cluster)
+        _emoji_sprite_cache[k] = None if base is None else base.resize((px, px), Image.Resampling.LANCZOS)
+    return _emoji_sprite_cache[k]
+
+def _split_emoji(text):
+    parts, last = [], 0
+    for m in _EMOJI_RE.finditer(text):
+        if m.start() > last:
+            parts.append((False, text[last:m.start()]))
+        parts.append((True, m.group()))
+        last = m.end()
+    if last < len(text):
+        parts.append((False, text[last:]))
+    return parts
+
+def _clean_plain(seg):
+    return seg.replace("\uFE0F", "").replace("\u200D", "")
+
+def text_width(draw, text, font):
+    """Lebar teks (px) termasuk emoji."""
+    px = _emoji_px(font)
+    adv = int(px * 1.1)
+    w = 0.0
+    for is_emoji, seg in _split_emoji(str(text)):
+        if is_emoji:
+            if _emoji_sprite(seg, px) is not None:
+                w += adv
+        else:
+            seg = _clean_plain(seg)
+            if seg:
+                w += draw.textlength(seg, font=font)
+    return int(w)
+
+def draw_text(img, draw, xy, text, font, fill):
+    """Pengganti draw.text() yang aman untuk emoji. img = gambar RGBA tujuan, draw = ImageDraw-nya."""
+    x, y = xy
+    px = _emoji_px(font)
+    adv = int(px * 1.1)
+    for is_emoji, seg in _split_emoji(str(text)):
+        if is_emoji:
+            sp = _emoji_sprite(seg, px)
+            if sp is not None:
+                ey = int(y + getattr(font, "size", 40) * 0.10)
+                try:
+                    img.alpha_composite(sp, (max(0, int(x)), max(0, ey)))
+                except ValueError:
+                    pass
+                x += adv
+        else:
+            seg = _clean_plain(seg)
+            if seg:
+                draw.text((x, y), seg, font=font, fill=fill)
+                x += draw.textlength(seg, font=font)
 
 def ease_in_out(t):
     return 0.5 - 0.5 * math.cos(math.pi * t)
@@ -154,12 +268,12 @@ def prebuild_page_base(desk_img, config, page_num=1):
         f_date = get_font("patrick", 26)
         f_pg = get_font("patrick", 22)
 
-        page_title = title if page_num == 1 else f"{title} (Hal. 2)"
-        pdraw.text((text_start_x, sy + 75), page_title, font=f_title, fill=(71, 85, 105, 240))
+        page_title = title if page_num == 1 else f"{title} (Hal. {page_num})"
+        draw_text(paper_layer, pdraw, (text_start_x, sy + 75), page_title, f_title, (71, 85, 105, 240))
 
         date_str = date_text
-        dw = int(pdraw.textlength(date_str, font=f_date))
-        pdraw.text((sx + sheet_w - dw - 60, sy + 78), date_str, font=f_date, fill=(100, 116, 139, 220))
+        dw = text_width(pdraw, date_str, f_date)
+        draw_text(paper_layer, pdraw, (sx + sheet_w - dw - 60, sy + 78), date_str, f_date, (100, 116, 139, 220))
 
         pg_str = f"Hal. {page_num}"
         pw = int(pdraw.textlength(pg_str, font=f_pg))
@@ -199,15 +313,15 @@ def draw_text_on_page(base_img, config, quote_lines, start_x, start_y, line_spac
 
         line_len = len(line)
         if chars_counted + line_len <= chars_to_show:
-            draw.text((start_x, curr_y), line, font=f_quote, fill=ink_color)
+            draw_text(out, draw, (start_x, curr_y), line, f_quote, ink_color)
             chars_counted += line_len
-            pen_pos = (start_x + int(draw.textlength(line, font=f_quote)), curr_y + 15)
+            pen_pos = (start_x + text_width(draw, line, f_quote), curr_y + 15)
         elif chars_counted < chars_to_show:
             p_count = chars_to_show - chars_counted
             p_text = line[:p_count]
-            draw.text((start_x, curr_y), p_text, font=f_quote, fill=ink_color)
+            draw_text(out, draw, (start_x, curr_y), p_text, f_quote, ink_color)
             chars_counted += p_count
-            pen_pos = (start_x + int(draw.textlength(p_text, font=f_quote)), curr_y + 15)
+            pen_pos = (start_x + text_width(draw, p_text, f_quote), curr_y + 15)
             curr_y += line_spacing
             break
         else:
@@ -218,11 +332,12 @@ def draw_text_on_page(base_img, config, quote_lines, start_x, start_y, line_spac
 
     has_signature = config.get("has_signature", True)
     if has_signature and sign_text.strip() and (reveal_chars is None or reveal_chars >= total_chars):
-        draw.text((start_x + 120, curr_y + 35), sign_text, font=f_sign, fill=(190, 24, 93, 240))
+        draw_text(out, draw, (start_x + 120, curr_y + 35), sign_text, f_sign, (190, 24, 93, 240))
 
     if config.get("has_watermark", True):
         wm_text = config.get("watermark", "📖 DIARY MOTIVATION • REVAI")
-        draw.text((WIDTH // 2 - 140, HEIGHT - 75), wm_text, font=f_watermark, fill=(148, 163, 184, 180))
+        wm_w = text_width(draw, wm_text, f_watermark)
+        draw_text(out, draw, (WIDTH // 2 - wm_w // 2, HEIGHT - 75), wm_text, f_watermark, (148, 163, 184, 180))
 
     return out, pen_pos
 
@@ -365,7 +480,7 @@ def draw_overlays_and_stickers(img, config):
                 img.alpha_composite(av, (px + 10, py + 10))
                 # Cute caption below polaroid
                 f_pola = get_font("patrick", 16)
-                draw.text((px + 38, py + 160), "Revai 💖", font=f_pola, fill=(71, 85, 105, 220))
+                draw_text(img, draw, (px + 38, py + 160), "Revai 💖", f_pola, (71, 85, 105, 220))
                 # Washi tape on top of polaroid
                 draw.polygon([
                     (px + 40, py - 12),
@@ -386,7 +501,7 @@ def draw_overlays_and_stickers(img, config):
             f_st = get_font("patrick", 16)
             draw.text((st_x - 32, st_y - 20), "APPROVED", font=f_st, fill=(225, 29, 72, 220))
             draw.text((st_x - 22, st_y - 2), "REVAI", font=f_st, fill=(225, 29, 72, 220))
-            draw.text((st_x - 12, st_y + 14), "💖", font=f_st, fill=(225, 29, 72, 220))
+            draw_text(img, draw, (st_x - 12, st_y + 14), "💖", f_st, (225, 29, 72, 220))
         elif stamp_type == "confidential":
             # Red rectangular distress stamp
             cx, cy = st_x - 30, st_y
@@ -398,13 +513,13 @@ def draw_overlays_and_stickers(img, config):
             draw.ellipse([st_x - 42, st_y - 42, st_x + 42, st_y + 42], outline=(217, 119, 6, 210), width=3)
             f_st = get_font("patrick", 16)
             draw.text((st_x - 28, st_y - 12), "PENTING", font=f_st, fill=(217, 119, 6, 220))
-            draw.text((st_x - 10, st_y + 8), "★", font=f_st, fill=(217, 119, 6, 220))
+            draw_text(img, draw, (st_x - 12, st_y + 4), "⭐", f_st, (217, 119, 6, 220))
         elif stamp_type == "catatan_hati":
             # Emerald seal
             draw.ellipse([st_x - 42, st_y - 42, st_x + 42, st_y + 42], outline=(5, 150, 105, 210), width=3)
             f_st = get_font("patrick", 15)
             draw.text((st_x - 36, st_y - 14), "CATATAN", font=f_st, fill=(5, 150, 105, 220))
-            draw.text((st_x - 20, st_y + 4), "HATI 🌿", font=f_st, fill=(5, 150, 105, 220))
+            draw_text(img, draw, (st_x - 20, st_y + 4), "HATI 🌿", f_st, (5, 150, 105, 220))
 
     # 4. Cinematic Filters (Vignette, Light Leak, Film Grain)
     if filter_type == "vignette":
