@@ -1,6 +1,7 @@
 import { TemplateDefinition } from "@/types/editor";
+import { EXTRA_TEMPLATE_PRESETS } from "./presets.extra";
 
-export const TEMPLATE_PRESETS: Record<string, TemplateDefinition> = {
+const BASE_PRESETS: Record<string, TemplateDefinition> = {
   asmr_code: {
     id: "asmr_code",
     name: "Tech & Code ASMR",
@@ -157,4 +158,10 @@ export const TEMPLATE_PRESETS: Record<string, TemplateDefinition> = {
       },
     ],
   },
+};
+
+/** Gabungan template bawaan + template tambahan (lihat presets.extra.ts). */
+export const TEMPLATE_PRESETS: Record<string, TemplateDefinition> = {
+  ...BASE_PRESETS,
+  ...(EXTRA_TEMPLATE_PRESETS as Record<string, TemplateDefinition>),
 };

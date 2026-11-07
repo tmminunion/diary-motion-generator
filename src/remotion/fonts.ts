@@ -1,5 +1,6 @@
 import { loadFont as loadPlusJakartaSans } from "@remotion/google-fonts/PlusJakartaSans";
 import { loadFont as loadJetBrainsMono } from "@remotion/google-fonts/JetBrainsMono";
+import { loadFont as loadCaveat } from "@remotion/google-fonts/Caveat";
 
 /**
  * Template memakai "Plus Jakarta Sans" dan "JetBrains Mono" tetapi font-nya
@@ -19,6 +20,10 @@ export const ensureFonts = (): void => {
     });
     loadJetBrainsMono("normal", {
       weights: ["400", "500", "700"],
+      subsets: ["latin"],
+    });
+    loadCaveat("normal", {
+      weights: ["400", "700"],
       subsets: ["latin"],
     });
   } catch (err) {

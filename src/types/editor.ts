@@ -7,7 +7,20 @@ export type TransitionType =
   | "wipe"
   | "none";
 
-export type SceneType = "code" | "story" | "spectrum" | "image" | "roblox";
+export type SceneType =
+  | "code"
+  | "story"
+  | "spectrum"
+  | "image"
+  | "roblox"
+  | "quote_minimal"
+  | "lyric_karaoke"
+  | "top_list"
+  | "breaking_news"
+  | "terminal_hacker"
+  | "diary_paper"
+  | "chat_dm"
+  | "stat_counter";
 
 export interface SceneData {
   id: string;
@@ -29,7 +42,19 @@ export interface SceneData {
   avatarPosition?: "center" | "bottom" | "left" | "right"; // Position of character
 }
 
-export type TemplateId = "asmr_code" | "story_quote" | "suno_visualizer" | "roblox_story";
+export type TemplateId =
+  | "asmr_code"
+  | "story_quote"
+  | "suno_visualizer"
+  | "roblox_story"
+  | "quote_minimal"
+  | "lyric_karaoke"
+  | "top_list"
+  | "breaking_news"
+  | "terminal_hacker"
+  | "diary_paper"
+  | "chat_dm"
+  | "stat_counter";
 
 export interface TemplateDefinition {
   id: TemplateId;
