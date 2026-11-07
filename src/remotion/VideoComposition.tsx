@@ -28,6 +28,7 @@ import { PollVersusScene } from "./templates/PollVersusScene";
 import { HudScannerScene } from "./templates/HudScannerScene";
 import { GlassAuroraScene } from "./templates/GlassAuroraScene";
 import { AiPromptScene } from "./templates/AiPromptScene";
+import { WaChatScene } from "./templates/WaChatScene";
 import { TEMPLATE_DEFAULT_TYPE } from "./templates/sceneTypes";
 import { getTransitionPresentation, getTransitionTiming } from "./transitions/TransitionRenderer";
 import { ensureFonts } from "./fonts";
@@ -57,6 +58,7 @@ const SIMPLE_SCENES: Partial<
   hud_scanner: HudScannerScene,
   glass_aurora: GlassAuroraScene,
   ai_prompt: AiPromptScene,
+  wa_chat: WaChatScene,
 };
 
 export const VideoComposition: React.FC<VideoProjectState> = ({

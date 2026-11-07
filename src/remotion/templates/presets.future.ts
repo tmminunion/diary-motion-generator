@@ -1,11 +1,12 @@
 import { TemplateDefinition, TemplateId } from "@/types/editor";
 
 /**
- * Template gelombang keempat: nuansa modern & futuristik (3 template).
+ * Template gelombang keempat: nuansa modern & futuristik, plus chat gaya WA (4 template).
  * Format content per template:
  * - hud_scanner : title = judul yang diketik, subtitle = label, content = "Label|0-100" (bar) atau teks biasa (log "> ...")
  * - glass_aurora: title = judul kartu utama, subtitle = label, content = "Judul|isi" atau teks biasa, satu kartu per baris
  * - ai_prompt   : title = nama asisten, subtitle = status, content = baris 1 prompt, baris berikutnya jawaban AI
+ * - wa_chat     : title = nama kontak, subtitle = status, content = "Nama: pesan" per baris; "# teks" = chip tanggal; akhiran " @00.07" = jam; baris emoji saja = emoji besar
  */
 export const FUTURE_TEMPLATE_PRESETS: Partial<Record<TemplateId, TemplateDefinition>> = {
   hud_scanner: {
@@ -100,6 +101,39 @@ export const FUTURE_TEMPLATE_PRESETS: Partial<Record<TemplateId, TemplateDefinit
         themeColor: "#38bdf8",
         transitionToNext: "none",
         sceneType: "ai_prompt",
+      },
+    ],
+  },
+  wa_chat: {
+    id: "wa_chat",
+    name: "Chat Gaya WA",
+    description: "Tampilan chat terang ala aplikasi pesan: pesan mengalir dari atas, centang biru, dan menggulung otomatis saat penuh.",
+    badge: "Story Chat 💚",
+    icon: "Smartphone",
+    defaultScenes: [
+      {
+        id: "scene-1",
+        name: "Scene 1: Ditanya Mamah",
+        durationInSeconds: 14,
+        title: "Mamah 💚",
+        subtitle: "online",
+        content:
+          "# Hari ini\nMamah: Aa, udah makan belum? @00.00\nAa Baim: Belum Mah, lagi ngoding\nMamah: Ngoding terus, nasi udah dingin\nMamah: 😢\nAa Baim: Iya Mah, lima menit lagi\nMamah: Itu kemarin juga lima menit @00.03",
+        themeColor: "#1fa855",
+        transitionToNext: "fade",
+        sceneType: "wa_chat",
+      },
+      {
+        id: "scene-2",
+        name: "Scene 2: Janji",
+        durationInSeconds: 12,
+        title: "Mamah 💚",
+        subtitle: "online",
+        content:
+          "Aa Baim: Mah, aku makan sekarang @00.05\nMamah: Nah gitu dong\nMamah: Pakai telur ya\nAa Baim: Siap Mah\nAa Baim: 🙂\nMamah: Jangan lupa cuci piring @00.06",
+        themeColor: "#1fa855",
+        transitionToNext: "none",
+        sceneType: "wa_chat",
       },
     ],
   },

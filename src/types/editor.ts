@@ -33,7 +33,8 @@ export type SceneType =
   | "poll_versus"
   | "hud_scanner"
   | "glass_aurora"
-  | "ai_prompt";
+  | "ai_prompt"
+  | "wa_chat";
 
 export interface SceneData {
   id: string;
@@ -80,7 +81,8 @@ export type TemplateId =
   | "poll_versus"
   | "hud_scanner"
   | "glass_aurora"
-  | "ai_prompt";
+  | "ai_prompt"
+  | "wa_chat";
 
 export interface TemplateDefinition {
   id: TemplateId;

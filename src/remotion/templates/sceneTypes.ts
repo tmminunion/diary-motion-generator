@@ -31,4 +31,5 @@ export const TEMPLATE_DEFAULT_TYPE: Record<TemplateId, SceneType> = {
   hud_scanner: "hud_scanner",
   glass_aurora: "glass_aurora",
   ai_prompt: "ai_prompt",
+  wa_chat: "wa_chat",
 };
