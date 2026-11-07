@@ -2,7 +2,13 @@ import React from "react";
 import { registerRoot, Composition } from "remotion";
 import { VideoComposition } from "./VideoComposition";
 import { VideoProjectState } from "../types/editor";
+import { getTotalDurationInFrames } from "./duration";
 
+/**
+ * Entry point Remotion untuk render server (Cloud Run / diary-studio).
+ * File ini ikut disalin oleh scripts/sync-to-diary.sh, jadi durasi render
+ * selalu dihitung dengan helper yang sama dengan Player di editor.
+ */
 export const RemotionRoot: React.FC = () => {
   return (
     <Composition
@@ -19,16 +25,12 @@ export const RemotionRoot: React.FC = () => {
         authorName: "Aa Baim",
         authorHandle: "@bungtemin",
         fps: 30,
-      } as VideoProjectState}
-      calculateMetadata={({ props }: { props: VideoProjectState }) => {
-        const fps = props.fps || 30;
-        const scenes = props.scenes || [];
-        const totalSeconds = scenes.reduce(
-          (acc: number, s: any) => acc + (Number(s.durationInSeconds) || 5),
-          0
-        );
+      } as unknown as Record<string, unknown>}
+      calculateMetadata={({ props }) => {
+        const project = props as unknown as VideoProjectState;
+        const fps = project.fps || 30;
         return {
-          durationInFrames: Math.max(Math.round(totalSeconds * fps), 30),
+          durationInFrames: getTotalDurationInFrames(project.scenes || [], fps),
           fps,
           width: 1080,
           height: 1920,

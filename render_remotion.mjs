@@ -64,6 +64,7 @@ async function main() {
     process.env.PUPPETEER_EXECUTABLE_PATH ||
     (fs.existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined);
 
+  let lastPct = -1;
   const renderOptions = {
     composition,
     serveUrl: bundleDir,
@@ -76,8 +77,9 @@ async function main() {
       ...(browserExecutable ? { browserExecutable } : {}),
     },
     onProgress: ({ progress }) => {
-      const pct = Math.round(progress * 100);
-      if (pct % 15 === 0 || pct === 100) {
+      const pct = Math.min(100, Math.floor((progress * 100) / 5) * 5);
+      if (pct !== lastPct) {
+        lastPct = pct;
         console.log(`[Remotion Render] Progress: ${pct}%`);
       }
     },

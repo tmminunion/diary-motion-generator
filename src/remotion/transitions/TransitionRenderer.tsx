@@ -4,6 +4,7 @@ import { flip } from "@remotion/transitions/flip";
 import { slide } from "@remotion/transitions/slide";
 import { wipe } from "@remotion/transitions/wipe";
 import { springTiming } from "@remotion/transitions";
+import { getTransitionFrames } from "../duration";
 
 export function getTransitionPresentation(type: TransitionType): any {
   switch (type) {
@@ -32,6 +33,6 @@ export function getTransitionTiming(fps: number = 30) {
       mass: 0.8,
       stiffness: 120,
     },
-    durationInFrames: Math.round(fps * 0.7), // 0.7s transition
+    durationInFrames: getTransitionFrames(fps), // overlap transisi, dibagi dengan helper durasi
   });
 }

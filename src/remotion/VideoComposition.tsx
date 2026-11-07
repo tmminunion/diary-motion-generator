@@ -8,6 +8,7 @@ import { AudioSpectrumScene } from "./templates/AudioSpectrumScene";
 import { ImageCinematicScene } from "./templates/ImageCinematicScene";
 import { RobloxStoryScene } from "./templates/RobloxStoryScene";
 import { getTransitionPresentation, getTransitionTiming } from "./transitions/TransitionRenderer";
+import { ensureFonts } from "./fonts";
 
 export const VideoComposition: React.FC<VideoProjectState> = ({
   templateId,
@@ -18,6 +19,8 @@ export const VideoComposition: React.FC<VideoProjectState> = ({
   authorName = "Aa Baim",
   authorHandle = "@bungtemin",
 }) => {
+  ensureFonts();
+
   return (
     <>
       {audioUrl && <Audio src={audioUrl} />}

@@ -87,6 +87,31 @@ DEFAULT_BOT_TOKEN = "8821651076:AAFUjZGp8JCAQV0ZCE1yiV0W4fJvhioiNmU"
 OLIP_BOT_TOKEN = "8787730585:AAE8ScJ8Cnc0CD3ncAIfkOb1cdSO8a4WtUw"
 DEFAULT_CHAT_ID = "1227103966"
 
+# ---------------------------------------------------------------------------
+# Pelacak progres render (in-memory). Browser memanggil /api/render-job (sync,
+# tetap terbuka sampai selesai) sambil polling /api/job-status?id=<jobId>.
+# ---------------------------------------------------------------------------
+JOBS = {}
+JOBS_LOCK = threading.Lock()
+JOB_TTL_SECONDS = 30 * 60
+JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
+
+def job_update(job_id, **fields):
+    if not job_id:
+        return
+    now = time.time()
+    with JOBS_LOCK:
+        for jid in [k for k, v in JOBS.items() if now - v.get("updatedAt", now) > JOB_TTL_SECONDS]:
+            JOBS.pop(jid, None)
+        job = JOBS.setdefault(job_id, {"status": "queued", "progress": 0, "stage": "Menunggu", "startedAt": now})
+        job.update(fields)
+        job["updatedAt"] = now
+
+def job_get(job_id):
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+        return dict(job) if job else None
+
 def send_telegram_media(target_file, caption, chat_id=None, bot_token=None):
     # Strictly ONE bot token per request
     token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", OLIP_BOT_TOKEN)
@@ -144,10 +169,36 @@ def escape_ffmpeg_text(text=""):
     t = t.replace("\\", "\\\\").replace("'", "’").replace(":", "\\:").replace("%", "\\%").replace(";", "\\;")
     return t
 
+def run_remotion_streaming(cmd, job_id, timeout=240):
+    """Jalankan render_remotion.mjs, baca stdout per baris dan teruskan persen progres ke JOBS."""
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    lines = []
+
+    def reader():
+        for line in proc.stdout:
+            lines.append(line)
+            m = re.search(r"Progress:\s*(\d+)%", line)
+            if m:
+                pct = int(m.group(1))
+                job_update(job_id, status="rendering", progress=5 + int(pct * 0.85),
+                           stage=f"Remotion merender frame... {pct}%")
+
+    t = threading.Thread(target=reader, daemon=True)
+    t.start()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        lines.append(f"\n[TIMEOUT] Remotion dihentikan setelah {timeout} detik\n")
+    t.join(timeout=5)
+    return proc.returncode, "".join(lines)
+
 def process_olip_render_job(project, chat_id, job_id, bot_token=None):
     # Strictly ONE bot token (Olive Bot for Olip Video Studio)
     bot_token = bot_token or OLIP_BOT_TOKEN
     try:
+        job_update(job_id, status="rendering", progress=2, stage="Menyiapkan proyek...", fallback=False)
         timestamp = int(time.time())
         session_dir = os.path.join(OUT_DIR, f"olip_{timestamp}")
         os.makedirs(session_dir, exist_ok=True)
@@ -179,23 +230,28 @@ def process_olip_render_job(project, chat_id, job_id, bot_token=None):
             json.dump(project, f, ensure_ascii=False, indent=2)
 
         remotion_success = False
+        remotion_error = ""
         if os.path.exists(remotion_script):
             print(f"[OLIP RENDER] Menjalankan Remotion renderer: {remotion_script}...", flush=True)
             cmd = ["node", remotion_script, "--input", project_json_path, "--output", final_mp4_path]
             try:
-                proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=240)
-                print(f"[REMOTION LOGS]:\n{proc.stdout}", flush=True)
-                if proc.returncode == 0 and os.path.exists(final_mp4_path) and os.path.getsize(final_mp4_path) > 1000:
+                job_update(job_id, status="rendering", progress=5, stage="Remotion merender frame...")
+                returncode, remotion_out = run_remotion_streaming(cmd, job_id, timeout=240)
+                print(f"[REMOTION LOGS]:\n{remotion_out}", flush=True)
+                if returncode == 0 and os.path.exists(final_mp4_path) and os.path.getsize(final_mp4_path) > 1000:
                     remotion_success = True
                     print(f"[OLIP RENDER] Remotion render berhasil sempurna: {final_mp4_path}", flush=True)
                 else:
-                    print(f"[REMOTION FAILED] Return code: {proc.returncode}\n{proc.stderr}", flush=True)
+                    remotion_error = (remotion_out or "")[-400:]
+                    print(f"[REMOTION FAILED] Return code: {returncode}", flush=True)
             except Exception as re_err:
+                remotion_error = str(re_err)
                 print(f"[REMOTION EXCEPTION] {re_err}", flush=True)
 
         # 2. Fallback to FFmpeg if Remotion CLI is not supported in current environment
         if not remotion_success:
             print("[OLIP RENDER] Fallback ke FFmpeg motion engine...", flush=True)
+            job_update(job_id, status="rendering", progress=60, stage="Remotion gagal, memakai mesin cadangan FFmpeg...", fallback=True, remotionError=remotion_error)
             font_p = os.path.join(BASE_DIR, "assets", "fonts", "PatrickHand-Regular.ttf")
             font_arg = f":fontfile='{font_p}'" if os.path.exists(font_p) else ""
 
@@ -319,7 +375,11 @@ def process_olip_render_job(project, chat_id, job_id, bot_token=None):
             f"⚡ <b>Engine:</b> {engine_label} @ Google Cloud Run (Jakarta `asia-southeast2`)\n\n"
             f"💖 <i>Video Remotion 1:1 Olip Studio mendarat sempurna untuk Aa Baim via Olive Bot!</i>"
         )
+        if not remotion_success:
+            caption += "\n\n⚠️ <i>Remotion gagal, video dibuat dengan mesin cadangan FFmpeg (tampilan lebih sederhana dari preview editor).</i>"
+        job_update(job_id, status="sending", progress=95, stage="Mengirim video ke Telegram...")
         send_telegram_media(final_mp4_path, caption, chat_id=chat_id, bot_token=bot_token)
+        job_update(job_id, status="done", progress=100, stage="Selesai", engine=engine_label, sizeMb=f"{size_mb:.2f}", fallback=not remotion_success)
         print(f"[OLIP RENDER] Selesai & terkirim ke Telegram: {final_mp4_name}", flush=True)
 
         # Cleanup session
@@ -334,6 +394,7 @@ def process_olip_render_job(project, chat_id, job_id, bot_token=None):
 
     except Exception as e:
         print(f"[OLIP RENDER ERROR] {e}", flush=True)
+        job_update(job_id, status="error", stage="Gagal", message=str(e))
         err_msg = f"❌ <b>Gagal Merender Video Olip Studio:</b> <code>{str(e)}</code>"
         send_telegram_text(chat_id, err_msg, bot_token=bot_token)
         raise e
@@ -462,6 +523,19 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/job-status":
+            qs = urllib.parse.parse_qs(parsed.query)
+            jid = (qs.get("id") or [""])[0]
+            job = job_get(jid) if JOB_ID_RE.match(jid) else None
+            payload = {"found": bool(job), **(job or {})}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
+            return
 
         if path == "/api/presets":
             self.send_response(200)
@@ -799,7 +873,8 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"error": "Payload proyek tidak valid"}).encode("utf-8"))
                     return
 
-                job_id = f"job_{int(time.time()*1000)}"
+                client_job_id = str(body.get("jobId") or "")
+                job_id = client_job_id if JOB_ID_RE.match(client_job_id) else f"job_{int(time.time()*1000)}"
                 bot_token = body.get("botToken") or body.get("bot_token")
                 # Run synchronously to ensure Cloud Run maintains 100% active CPU!
                 result = process_olip_render_job(project, chat_id, job_id, bot_token=bot_token)
@@ -810,6 +885,8 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                     "status": "completed",
                     "file": result.get("file"),
                     "sizeMb": result.get("sizeMb"),
+                    "engine": result.get("engine"),
+                    "fallback": "FFmpeg" in str(result.get("engine", "")),
                     "message": "Video MP4 berhasil dirender di Cloud Run Jakarta dan sudah dikirim ke Telegram Aa Baim! 🚀✨"
                 }
                 self.send_response(200)
