@@ -83,9 +83,27 @@ def auto_wrap_text(text, max_chars=36):
         wrapped_paras.append("\n".join(lines))
     return "\n".join(wrapped_paras)
 
-DEFAULT_BOT_TOKEN = "8821651076:AAFUjZGp8JCAQV0ZCE1yiV0W4fJvhioiNmU"
-OLIP_BOT_TOKEN = "8787730585:AAE8ScJ8Cnc0CD3ncAIfkOb1cdSO8a4WtUw"
-DEFAULT_CHAT_ID = "1227103966"
+def _load_dotenv(path=None):
+    """Muat file .env (KEY=VALUE) ke os.environ tanpa menimpa variabel yang sudah ada.
+    File .env TIDAK boleh di-commit. Di Cloud Run pakai env var service."""
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        pass
+
+
+_load_dotenv()
+
+# Secret diambil dari environment (lihat .env.example). Jangan hardcode token di sini.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+DEFAULT_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # ---------------------------------------------------------------------------
 # Pelacak progres render (in-memory). Browser memanggil /api/render-job (sync,
@@ -114,8 +132,11 @@ def job_get(job_id):
 
 def send_telegram_media(target_file, caption, chat_id=None, bot_token=None):
     # Strictly ONE bot token per request
-    token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", OLIP_BOT_TOKEN)
-    target_chat = str(chat_id or os.environ.get("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID))
+    token = bot_token or TELEGRAM_BOT_TOKEN
+    target_chat = str(chat_id or DEFAULT_CHAT_ID)
+    if not token or not target_chat:
+        print("[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum diatur, kirim dilewati", flush=True)
+        return None
 
     if target_file.endswith(".mp4"):
         endpoint = "sendVideo"
@@ -145,8 +166,11 @@ def send_telegram_media(target_file, caption, chat_id=None, bot_token=None):
 
 def send_telegram_text(chat_id, text, bot_token=None):
     # Strictly ONE bot token per request
-    token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", OLIP_BOT_TOKEN)
+    token = bot_token or TELEGRAM_BOT_TOKEN
     target_chat = str(chat_id or DEFAULT_CHAT_ID)
+    if not token or not target_chat:
+        print("[telegram] TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum diatur, kirim dilewati", flush=True)
+        return None
     cmd = [
         "curl", "-4", "-s", "-X", "POST",
         f"https://api.telegram.org/bot{token}/sendMessage",
@@ -196,7 +220,7 @@ def run_remotion_streaming(cmd, job_id, timeout=240):
 
 def process_olip_render_job(project, chat_id, job_id, bot_token=None):
     # Strictly ONE bot token (Olive Bot for Olip Video Studio)
-    bot_token = bot_token or OLIP_BOT_TOKEN
+    bot_token = bot_token or TELEGRAM_BOT_TOKEN
     try:
         job_update(job_id, status="rendering", progress=2, stage="Menyiapkan proyek...", fallback=False)
         timestamp = int(time.time())

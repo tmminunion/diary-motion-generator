@@ -21,3 +21,6 @@ Thumbs.db
 # Backups & legacy
 *.bak*
 public/engine_old.py
+
+# Secrets
+.env

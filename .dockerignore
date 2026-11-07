@@ -7,3 +7,4 @@ out/*.png
 server.log
 nohup.out
 .DS_Store
+.env

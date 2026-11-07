@@ -8,3 +8,4 @@ out/*.png
 !out/.gitkeep
 server.log
 nohup.out
+.env

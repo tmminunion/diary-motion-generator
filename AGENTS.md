@@ -39,11 +39,16 @@ POST: `/api/projects`, `/api/projects/delete`, `/api/generate-image`, `/api/gene
 | Nama | Fungsi |
 |---|---|
 | `PORT` | Port server (Cloud Run = 8080, Termux = 8089) |
-| `TELEGRAM_BOT_TOKEN` | Token bot untuk kirim hasil render |
+| `TELEGRAM_BOT_TOKEN` | Token bot untuk kirim hasil render. Tanpa ini pengiriman Telegram dilewati |
 | `TELEGRAM_CHAT_ID` | Chat tujuan default |
 
-Nilai secret JANGAN pernah ditulis ke repo/dokumen. Di Cloud Run sudah terpasang sebagai env var service;
-`gcloud run deploy` berikutnya mempertahankannya.
+- Termux: isi file `.env` di root repo (format `KEY=VALUE`, di-ignore git, dimuat otomatis oleh `server.py`).
+  Contoh format ada di `.env.example`.
+- Cloud Run: env var service (`gcloud run services update diary-studio --region asia-southeast2 --update-env-vars KEY=VALUE`).
+  Deploy berikutnya mempertahankannya. `.env` tidak ikut ter-upload (ada di `.dockerignore` dan `.gcloudignore`).
+- Token lama pernah hardcoded di `server.py` dan ada di riwayat git: anggap bocor, rotate lewat @BotFather,
+  lalu perbarui nilai di `.env` lokal, Cloud Run, dan Vercel (Olip). Kode tidak perlu diubah.
+- JANGAN menulis nilai secret ke repo/dokumen.
 
 ## Alur kerja perubahan template (parity)
 1. Edit template di `olip-video-studio` (bukan di sini).
