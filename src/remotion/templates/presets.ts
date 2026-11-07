@@ -1,5 +1,6 @@
 import { TemplateDefinition } from "@/types/editor";
 import { EXTRA_TEMPLATE_PRESETS } from "./presets.extra";
+import { MORE_TEMPLATE_PRESETS } from "./presets.more";
 
 const BASE_PRESETS: Record<string, TemplateDefinition> = {
   asmr_code: {
@@ -164,4 +165,5 @@ const BASE_PRESETS: Record<string, TemplateDefinition> = {
 export const TEMPLATE_PRESETS: Record<string, TemplateDefinition> = {
   ...BASE_PRESETS,
   ...(EXTRA_TEMPLATE_PRESETS as Record<string, TemplateDefinition>),
+  ...(MORE_TEMPLATE_PRESETS as Record<string, TemplateDefinition>),
 };

@@ -1,7 +1,7 @@
 import React from "react";
 import { Audio, staticFile } from "remotion";
 import { TransitionSeries } from "@remotion/transitions";
-import { SceneType, TemplateId, VideoProjectState } from "@/types/editor";
+import { SceneType, VideoProjectState } from "@/types/editor";
 import { CodingAsmrScene } from "./templates/CodingAsmrScene";
 import { StoryChatScene } from "./templates/StoryChatScene";
 import { AudioSpectrumScene } from "./templates/AudioSpectrumScene";
@@ -15,24 +15,19 @@ import { TerminalHackerScene } from "./templates/TerminalHackerScene";
 import { DiaryPaperScene } from "./templates/DiaryPaperScene";
 import { ChatDmScene } from "./templates/ChatDmScene";
 import { StatCounterScene } from "./templates/StatCounterScene";
+import { NeonSignScene } from "./templates/NeonSignScene";
+import { BeforeAfterScene } from "./templates/BeforeAfterScene";
+import { ChecklistTodoScene } from "./templates/ChecklistTodoScene";
+import { CinematicTitleScene } from "./templates/CinematicTitleScene";
+import { CountdownIntroScene } from "./templates/CountdownIntroScene";
+import { SpiralNotebookScene } from "./templates/SpiralNotebookScene";
+import { TimelineStoryScene } from "./templates/TimelineStoryScene";
+import { QnaCardScene } from "./templates/QnaCardScene";
+import { ReceiptStrukScene } from "./templates/ReceiptStrukScene";
+import { PollVersusScene } from "./templates/PollVersusScene";
+import { TEMPLATE_DEFAULT_TYPE } from "./templates/sceneTypes";
 import { getTransitionPresentation, getTransitionTiming } from "./transitions/TransitionRenderer";
 import { ensureFonts } from "./fonts";
-
-/** Template -> tipe scene default. Template baru cukup ditambah di sini. */
-const TEMPLATE_DEFAULT_TYPE: Record<TemplateId, SceneType> = {
-  asmr_code: "code",
-  story_quote: "story",
-  suno_visualizer: "spectrum",
-  roblox_story: "roblox",
-  quote_minimal: "quote_minimal",
-  lyric_karaoke: "lyric_karaoke",
-  top_list: "top_list",
-  breaking_news: "breaking_news",
-  terminal_hacker: "terminal_hacker",
-  diary_paper: "diary_paper",
-  chat_dm: "chat_dm",
-  stat_counter: "stat_counter",
-};
 
 /** Tipe scene baru (tanpa props khusus) -> komponen. */
 const SIMPLE_SCENES: Partial<
@@ -46,6 +41,16 @@ const SIMPLE_SCENES: Partial<
   diary_paper: DiaryPaperScene,
   chat_dm: ChatDmScene,
   stat_counter: StatCounterScene,
+  neon_sign: NeonSignScene,
+  before_after: BeforeAfterScene,
+  checklist_todo: ChecklistTodoScene,
+  cinematic_title: CinematicTitleScene,
+  countdown_intro: CountdownIntroScene,
+  spiral_notebook: SpiralNotebookScene,
+  timeline_story: TimelineStoryScene,
+  qna_card: QnaCardScene,
+  receipt_struk: ReceiptStrukScene,
+  poll_versus: PollVersusScene,
 };
 
 export const VideoComposition: React.FC<VideoProjectState> = ({

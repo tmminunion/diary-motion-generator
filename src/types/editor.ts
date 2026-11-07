@@ -20,7 +20,17 @@ export type SceneType =
   | "terminal_hacker"
   | "diary_paper"
   | "chat_dm"
-  | "stat_counter";
+  | "stat_counter"
+  | "neon_sign"
+  | "before_after"
+  | "checklist_todo"
+  | "cinematic_title"
+  | "countdown_intro"
+  | "spiral_notebook"
+  | "timeline_story"
+  | "qna_card"
+  | "receipt_struk"
+  | "poll_versus";
 
 export interface SceneData {
   id: string;
@@ -54,7 +64,17 @@ export type TemplateId =
   | "terminal_hacker"
   | "diary_paper"
   | "chat_dm"
-  | "stat_counter";
+  | "stat_counter"
+  | "neon_sign"
+  | "before_after"
+  | "checklist_todo"
+  | "cinematic_title"
+  | "countdown_intro"
+  | "spiral_notebook"
+  | "timeline_story"
+  | "qna_card"
+  | "receipt_struk"
+  | "poll_versus";
 
 export interface TemplateDefinition {
   id: TemplateId;
