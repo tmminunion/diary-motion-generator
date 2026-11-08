@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Diary Motion Generator - Core Engine v2.1 (Turbo Optimized)
-- Clean book styling (NO punch holes, NO red margin)
+- Clean book styling by default; optional binding="spiral" (spiral coils on the left edge)
 - Realistic multi-page support with animated page-flip / kebetan buku
 - Flexible background scenes (Meja Kayu, Kafe, Modern, Kamar Malam, Taman)
 - 9:16 Vertical Video (1080x1920) with PIL + FFmpeg pipe
@@ -239,17 +239,50 @@ def prebuild_page_base(desk_img, config, page_num=1):
     # 1. Main Sheet Shape
     pdraw.rounded_rectangle([sx, sy, sx + sheet_w, sy + sheet_h], radius=24, fill=paper_bg, outline=paper_outline, width=2)
 
-    # 2. Book Spine Crease on Left
-    spine_x = sx + 24
-    pdraw.line([(spine_x, sy + 15), (spine_x, sy + sheet_h - 15)], fill=(180, 170, 155, 90), width=3)
-    pdraw.line([(spine_x + 2, sy + 15), (spine_x + 2, sy + sheet_h - 15)], fill=(255, 255, 255, 140), width=2)
-    for stitch_y in range(sy + 80, sy + sheet_h - 60, 110):
-        pdraw.line([(sx + 8, stitch_y), (sx + 20, stitch_y)], fill=(140, 125, 110, 160), width=2)
+    binding = config.get("binding", "book")
+    if binding == "spiral":
+        # 2. Spiral binding. Kawat masuk dari belakang lewat lubang, muncul di depan,
+        #    lalu melingkar di tepi kiri. Bagian belakang kawat tertutup kertas.
+        hole_x = sx + 38
+        back_layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+        bdraw = ImageDraw.Draw(back_layer)
+        ys = list(range(sy + 70, sy + sheet_h - 50, 58))
+        # a) kawat belakang (digambar di bawah kertas, jadi hanya yang di luar tepi terlihat)
+        for hy in ys:
+            bdraw.ellipse([sx - 36, hy - 3, sx + 44, hy + 21], outline=(0, 0, 0, 70), width=11)
+            bdraw.ellipse([sx - 34, hy - 5, sx + 42, hy + 19], outline=(72, 78, 90, 255), width=8)
+            bdraw.arc([sx - 32, hy - 3, sx + 40, hy + 17], start=150, end=250, fill=(140, 147, 160, 255), width=2)
+        # b) lubang di kertas
+        for hy in ys:
+            pdraw.ellipse([hole_x - 12, hy - 12, hole_x + 12, hy + 12], fill=(255, 255, 255, 0))
+            pdraw.ellipse([hole_x - 11, hy - 11, hole_x + 11, hy + 11], fill=(46, 40, 34, 255))
+            pdraw.arc([hole_x - 11, hy - 11, hole_x + 11, hy + 11], start=180, end=360, fill=(20, 17, 14, 255), width=3)
+            pdraw.arc([hole_x - 11, hy - 11, hole_x + 11, hy + 11], start=20, end=160, fill=(120, 108, 96, 150), width=2)
+        # c) kawat depan: dari dalam lubang, melintasi kertas, lalu keluar di tepi kiri
+        for hy in ys:
+            x0, y0 = hole_x + 2, hy - 1
+            x1, y1 = sx - 29, hy + 9
+            # bayangan kawat di atas kertas
+            pdraw.line([(x0 + 2, y0 + 9), (x1 + 8, y1 + 9)], fill=(60, 50, 40, 70), width=10)
+            # badan kawat: tepi gelap, inti perak, kilau
+            pdraw.line([(x0, y0), (x1, y1)], fill=(70, 76, 88, 255), width=11)
+            pdraw.line([(x0, y0), (x1, y1)], fill=(172, 179, 191, 255), width=8)
+            pdraw.line([(x0 + 4, y0 - 1), (x1 + 2, y1 - 2)], fill=(246, 248, 252, 255), width=3)
+            pdraw.ellipse([x1 - 5, y1 - 5, x1 + 5, y1 + 5], fill=(120, 127, 140, 255))
+            # ujung kawat masuk lubang: bayangan di dalam lubang
+            pdraw.ellipse([hole_x - 4, hy - 7, hole_x + 8, hy + 5], fill=(30, 26, 22, 160))
+    else:
+        # 2. Book Spine Crease on Left
+        spine_x = sx + 24
+        pdraw.line([(spine_x, sy + 15), (spine_x, sy + sheet_h - 15)], fill=(180, 170, 155, 90), width=3)
+        pdraw.line([(spine_x + 2, sy + 15), (spine_x + 2, sy + sheet_h - 15)], fill=(255, 255, 255, 140), width=2)
+        for stitch_y in range(sy + 80, sy + sheet_h - 60, 110):
+            pdraw.line([(sx + 8, stitch_y), (sx + 20, stitch_y)], fill=(140, 125, 110, 160), width=2)
 
     # 3. Ruled Lines (NO red margin)
     line_y_start = sy + 180
     line_y_end = sy + sheet_h - 90
-    text_start_x = sx + 75
+    text_start_x = sx + (118 if binding == "spiral" else 75)
     text_max_x = sx + sheet_w - 75
 
     if paper_style == "grid":
@@ -260,7 +293,7 @@ def prebuild_page_base(desk_img, config, page_num=1):
             pdraw.line([(sx + 20, gy), (sx + sheet_w - 20, gy)], fill=line_col, width=1)
     elif paper_style != "clean":
         for ly in range(line_y_start, line_y_end, line_spacing):
-            pdraw.line([(sx + 25, ly), (sx + sheet_w - 25, ly)], fill=line_col, width=2)
+            pdraw.line([(sx + (75 if binding == "spiral" else 25), ly), (sx + sheet_w - 25, ly)], fill=line_col, width=2)
 
     # 4. Header & Page pill
     if has_header:
@@ -279,6 +312,8 @@ def prebuild_page_base(desk_img, config, page_num=1):
         pw = int(pdraw.textlength(pg_str, font=f_pg))
         pdraw.text((sx + sheet_w - pw - 45, sy + sheet_h - 60), pg_str, font=f_pg, fill=(148, 163, 184, 180))
 
+    if binding == "spiral":
+        out.alpha_composite(back_layer)
     out.alpha_composite(paper_layer)
     return out, text_start_x, line_y_start, line_spacing, text_max_x
 

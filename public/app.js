@@ -27,6 +27,7 @@ const state = {
   font_size: 46,
   line_spacing: 56,
   paper_style: "ruled",
+  binding: "spiral", // "spiral" atau "book"
   ink_color: "#1a368a",
   bg_scene: "meja_kayu",
   duration: 46.5,      // Total waktu: 15+5 + 1.5 + 20+5 = 46.5 detik
@@ -278,6 +279,7 @@ function applyPreset(p) {
 
   updateFontUI(state.font_name);
   updatePaperUI(state.paper_style);
+  updateBindingUI(state.binding);
   updateInkUI(state.ink_color);
   updateBadges();
 
@@ -801,6 +803,16 @@ function setupEventListeners() {
     });
   });
 
+  // Binding options (spiral / buku)
+  document.querySelectorAll(".binding-opt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.binding = btn.getAttribute("data-binding");
+      updateBindingUI(state.binding);
+      renderCanvas();
+    });
+  });
+  updateBindingUI(state.binding);
+
   // Overlay & Sticker options
   document.querySelectorAll(".stamp-opt-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1015,6 +1027,9 @@ function updateFontSizeUI(sz) {
 function updatePaperUI(p) {
   document.querySelectorAll(".paper-opt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-paper") === p));
 }
+function updateBindingUI(b) {
+  document.querySelectorAll(".binding-opt-btn").forEach(x => x.classList.toggle("active", x.getAttribute("data-binding") === b));
+}
 function updateInkUI(ink) {
   document.querySelectorAll(".ink-opt-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-ink") === ink));
 }
@@ -1102,6 +1117,7 @@ async function saveCurrentProjectToDb() {
     font_size: state.font_size,
     line_spacing: state.line_spacing,
     paper_style: state.paper_style,
+    binding: state.binding,
     ink_color: state.ink_color,
     bg_scene: state.bg_scene,
     duration: state.duration,
@@ -1153,6 +1169,7 @@ async function loadProjectFromDb(id) {
       if (d.font_size) state.font_size = d.font_size;
       if (d.line_spacing) state.line_spacing = d.line_spacing;
       if (d.paper_style) state.paper_style = d.paper_style;
+      state.binding = d.binding || "book";
       if (d.ink_color) state.ink_color = d.ink_color;
       if (d.bg_scene) state.bg_scene = d.bg_scene;
       if (d.audio_file) state.audio_file = d.audio_file;
@@ -1170,6 +1187,7 @@ async function loadProjectFromDb(id) {
       updateFontUI(state.font_name);
       updateFontSizeUI(state.font_size || 46);
       updatePaperUI(state.paper_style);
+      updateBindingUI(state.binding);
       updateInkUI(state.ink_color);
       updateBadges();
 
@@ -1369,6 +1387,27 @@ function renderCanvas() {
   const sy = 170;
   const radius = 24;
 
+  // Spiral: kawat bagian belakang digambar DULU, lalu tertutup kertas
+  const isSpiral = state.binding === "spiral";
+  const spiral_ys = [];
+  if (isSpiral) {
+    for (let yy = sy + 70; yy < sy + sheet_h - 50; yy += 58) spiral_ys.push(yy);
+    ctx.save();
+    spiral_ys.forEach(hy => {
+      ctx.beginPath();
+      ctx.ellipse(sx + 4, hy + 7, 38, 12, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(0,0,0,0.27)";
+      ctx.lineWidth = 11;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(sx + 4, hy + 7, 37, 11, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = "#484e5a";
+      ctx.lineWidth = 8;
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
   // Drop Shadow for Notebook
   ctx.save();
   ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
@@ -1407,36 +1446,86 @@ function renderCanvas() {
   ctx.stroke();
   ctx.restore();
 
-  // 3. Authentic Book Spine Crease on Left (No Punch Holes)
-  const spine_x = sx + 24;
-  ctx.beginPath();
-  ctx.strokeStyle = "rgba(180, 170, 155, 0.6)";
-  ctx.lineWidth = 3;
-  ctx.moveTo(spine_x, sy + 15);
-  ctx.lineTo(spine_x, sy + sheet_h - 15);
-  ctx.stroke();
+  if (isSpiral) {
+    // 3. Spiral: lubang di kertas + kawat depan yang keluar dari lubang
+    const hole_x = sx + 38;
+    ctx.save();
+    ctx.lineCap = "round";
+    spiral_ys.forEach(hy => {
+      ctx.beginPath();
+      ctx.arc(hole_x, hy, 11, 0, Math.PI * 2);
+      ctx.fillStyle = "#2e2822";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(hole_x, hy, 11, Math.PI, Math.PI * 2);
+      ctx.strokeStyle = "#14110e";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(hole_x + 2, hy - 1, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(30,26,22,0.63)";
+      ctx.fill();
 
-  ctx.beginPath();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-  ctx.lineWidth = 2;
-  ctx.moveTo(spine_x + 2, sy + 15);
-  ctx.lineTo(spine_x + 2, sy + sheet_h - 15);
-  ctx.stroke();
-
-  // Spine stitches
-  ctx.strokeStyle = "rgba(140, 125, 110, 0.7)";
-  ctx.lineWidth = 2;
-  for (let sty = sy + 80; sty < sy + sheet_h - 60; sty += 110) {
+      const x0 = hole_x + 2, y0 = hy - 1;
+      const x1 = sx - 29, y1 = hy + 9;
+      ctx.beginPath();
+      ctx.moveTo(x0 + 2, y0 + 9);
+      ctx.lineTo(x1 + 8, y1 + 9);
+      ctx.strokeStyle = "rgba(60,50,40,0.28)";
+      ctx.lineWidth = 10;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.strokeStyle = "#464c58";
+      ctx.lineWidth = 11;
+      ctx.stroke();
+      ctx.strokeStyle = "#acb3bf";
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x0 + 4, y0 - 1);
+      ctx.lineTo(x1 + 2, y1 - 2);
+      ctx.strokeStyle = "#f6f8fc";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x1, y1, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#787f8c";
+      ctx.fill();
+    });
+    ctx.restore();
+  } else {
+    const spine_x = sx + 24;
     ctx.beginPath();
-    ctx.moveTo(sx + 8, sty);
-    ctx.lineTo(sx + 20, sty);
+    ctx.strokeStyle = "rgba(180, 170, 155, 0.6)";
+    ctx.lineWidth = 3;
+    ctx.moveTo(spine_x, sy + 15);
+    ctx.lineTo(spine_x, sy + sheet_h - 15);
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.lineWidth = 2;
+    ctx.moveTo(spine_x + 2, sy + 15);
+    ctx.lineTo(spine_x + 2, sy + sheet_h - 15);
+    ctx.stroke();
+
+    // Spine stitches
+    ctx.strokeStyle = "rgba(140, 125, 110, 0.7)";
+    ctx.lineWidth = 2;
+    for (let sty = sy + 80; sty < sy + sheet_h - 60; sty += 110) {
+      ctx.beginPath();
+      ctx.moveTo(sx + 8, sty);
+      ctx.lineTo(sx + 20, sty);
+      ctx.stroke();
+    }
   }
 
   // 4. Horizontal Ruled Lines (NO Red Margin)
   const line_y_start = sy + 180;
   const line_y_end = sy + sheet_h - 90;
-  const text_start_x = sx + 75;
+  const text_start_x = sx + (isSpiral ? 118 : 75);
 
   if (state.paper_style === "grid") {
     const grid_step = 40;
@@ -1457,7 +1546,7 @@ function renderCanvas() {
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let ly = line_y_start; ly < line_y_end; ly += state.line_spacing) {
-      ctx.moveTo(sx + 25, ly);
+      ctx.moveTo(sx + (isSpiral ? 75 : 25), ly);
       ctx.lineTo(sx + sheet_w - 25, ly);
     }
     ctx.stroke();
@@ -1895,6 +1984,7 @@ async function triggerVideoRender(sendTelegramAfter = false) {
     font_size: state.font_size,
     line_spacing: state.line_spacing,
     paper_style: state.paper_style,
+    binding: state.binding,
     ink_color: state.ink_color,
     bg_scene: state.bg_scene,
     duration: state.duration,
@@ -1982,6 +2072,7 @@ async function triggerDownloadStill() {
     font_size: state.font_size,
     line_spacing: state.line_spacing,
     paper_style: state.paper_style,
+    binding: state.binding,
     ink_color: state.ink_color,
     bg_scene: state.bg_scene,
     overlays: state.overlays,
