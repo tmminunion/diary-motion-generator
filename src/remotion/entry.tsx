@@ -3,6 +3,7 @@ import { registerRoot, Composition } from "remotion";
 import { VideoComposition } from "./VideoComposition";
 import { VideoProjectState } from "../types/editor";
 import { getTotalDurationInFrames } from "./duration";
+import { AfterProductionDiaryComposition, diaryDurationInFrames, FPS as DIARY_FPS, W as DIARY_W, H as DIARY_H } from "./AfterDiary";
 
 /**
  * Entry point Remotion untuk render server (Cloud Run / diary-studio).
@@ -11,6 +12,20 @@ import { getTotalDurationInFrames } from "./duration";
  */
 export const RemotionRoot: React.FC = () => {
   return (
+    <>
+    <Composition
+      id="AfterDiary"
+      component={AfterProductionDiaryComposition as any}
+      durationInFrames={300}
+      fps={DIARY_FPS}
+      width={DIARY_W}
+      height={DIARY_H}
+      defaultProps={{ data: { date: "2026-01-01", shift: "RED", jamPulang: "-", tasks: [] } } as unknown as Record<string, unknown>}
+      calculateMetadata={({ props }) => {
+        const tasks = ((props as any)?.data?.tasks || []) as unknown[];
+        return { durationInFrames: diaryDurationInFrames(tasks.length), fps: DIARY_FPS, width: DIARY_W, height: DIARY_H };
+      }}
+    />
     <Composition
       id="OlipStudio"
       component={VideoComposition as any}
@@ -37,6 +52,7 @@ export const RemotionRoot: React.FC = () => {
         };
       }}
     />
+    </>
   );
 };
 

@@ -11,10 +11,14 @@ async function main() {
   const args = process.argv.slice(2);
   let inputJsonPath = null;
   let outputPath = null;
+  let compId = "OlipStudio";
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--input" && args[i + 1]) {
       inputJsonPath = args[i + 1];
+      i++;
+    } else if (args[i] === "--comp" && args[i + 1]) {
+      compId = args[i + 1];
       i++;
     } else if (args[i] === "--output" && args[i + 1]) {
       outputPath = args[i + 1];
@@ -42,12 +46,12 @@ async function main() {
   console.log(`[Remotion Render] Loading bundle from ${bundleDir}...`);
   const composition = await selectComposition({
     serveUrl: bundleDir,
-    id: "OlipStudio",
+    id: compId,
     inputProps: project,
   });
 
   const durationSec = (composition.durationInFrames / composition.fps).toFixed(1);
-  console.log(`[Remotion Render] Composition 'OlipStudio' loaded successfully:`);
+  console.log(`[Remotion Render] Composition '${compId}' loaded successfully:`);
   console.log(`  - Dimensions: ${composition.width}x${composition.height}`);
   console.log(`  - FPS: ${composition.fps}`);
   console.log(`  - Total Frames: ${composition.durationInFrames} (~${durationSec}s)`);

@@ -218,6 +218,66 @@ def run_remotion_streaming(cmd, job_id, timeout=240):
     t.join(timeout=5)
     return proc.returncode, "".join(lines)
 
+# ---------------------------------------------------------------------------
+# After Produksi Video Diary (ubnetwork): render MP4 -> kirim ke WhatsApp
+# ---------------------------------------------------------------------------
+DIARY_API_KEY = os.environ.get("DIARY_API_KEY", "")
+BAILEY_WASEND_URL = os.environ.get("BAILEY_WASEND_URL", "http://34.16.81.31:3132/wasend")
+MAX_DIARY_TASKS = 60
+
+
+def _wa_target(raw):
+    raw = str(raw or "").strip()
+    if not raw:
+        return ""
+    if raw.endswith("@g.us") or raw.endswith("@s.whatsapp.net"):
+        return raw
+    digits = re.sub(r"\D", "", raw)
+    if digits.startswith("0"):
+        digits = "62" + digits[1:]
+    return digits
+
+
+def process_after_diary(data, target, caption, filename):
+    """Render komposisi 'AfterDiary' (Remotion) lalu kirim MP4 via bot WA (Baileys)."""
+    import urllib.request
+    ts = int(time.time() * 1000)
+    work = os.path.join(OUT_DIR, f"afterdiary_{ts}")
+    os.makedirs(work, exist_ok=True)
+    props_path = os.path.join(work, "props.json")
+    mp4_path = os.path.join(work, "diary.mp4")
+    try:
+        with open(props_path, "w", encoding="utf-8") as f:
+            json.dump({"data": data}, f, ensure_ascii=False)
+        cmd = ["node", os.path.join(BASE_DIR, "render_remotion.mjs"),
+               "--comp", "AfterDiary", "--input", props_path, "--output", mp4_path]
+        t0 = time.time()
+        rc, out = run_remotion_streaming(cmd, f"afterdiary_{ts}", timeout=240)
+        if rc != 0 or not os.path.exists(mp4_path) or os.path.getsize(mp4_path) < 1000:
+            raise RuntimeError("Render Remotion gagal: " + (out or "")[-300:])
+        render_s = round(time.time() - t0, 1)
+        size = os.path.getsize(mp4_path)
+        with open(mp4_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        payload = json.dumps({
+            "nomorTujuan": target,
+            "pesan": caption,
+            "base64Data": b64,
+            "mimetype": "video/mp4",
+            "filename": filename,
+        }).encode("utf-8")
+        req = urllib.request.Request(BAILEY_WASEND_URL, data=payload,
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            wa = json.loads(resp.read().decode("utf-8") or "{}")
+        ok = wa.get("status") == "sukses" or wa.get("success") is True
+        if not ok:
+            raise RuntimeError("Bot WA menolak: " + str(wa.get("message") or wa.get("error") or wa)[:200])
+        return {"renderSeconds": render_s, "sizeMb": round(size / 1048576, 2)}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def process_olip_render_job(project, chat_id, job_id, bot_token=None):
     # Strictly ONE bot token (Olive Bot for Olip Video Studio)
     bot_token = bot_token or TELEGRAM_BOT_TOKEN
@@ -758,10 +818,15 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 mime = "application/javascript"
             elif file_path.endswith(".css"):
                 mime = "text/css"
+            elif file_path.endswith("manifest.json") or file_path.endswith(".webmanifest"):
+                mime = "application/manifest+json"
 
             self.send_response(200)
             self.send_header("Content-Type", (mime or "text/plain") + "; charset=utf-8" if "text" in (mime or "") else (mime or "application/octet-stream"))
             self.send_header("Content-Length", str(os.path.getsize(file_path)))
+            if file_path.endswith("sw.js") or file_path.endswith("manifest.json"):
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Service-Worker-Allowed", "/")
             self.send_cors_headers()
             self.end_headers()
             with open(file_path, "rb") as f:
@@ -986,6 +1051,37 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 self.send_cors_headers()
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+            return
+
+        if path == "/api/after-diary":
+            def _reply(code, obj):
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
+            try:
+                import hmac
+                given = self.headers.get("X-Diary-Key", "")
+                if not DIARY_API_KEY or not hmac.compare_digest(given, DIARY_API_KEY):
+                    _reply(401, {"success": False, "error": "Unauthorized"})
+                    return
+                data = body.get("data") or {}
+                tasks = data.get("tasks")
+                target = _wa_target(body.get("target"))
+                if not target:
+                    _reply(400, {"success": False, "error": "Target WhatsApp wajib diisi"})
+                    return
+                if not isinstance(tasks, list) or len(tasks) > MAX_DIARY_TASKS or data.get("shift") not in ("RED", "WHITE"):
+                    _reply(400, {"success": False, "error": "Data diary tidak valid"})
+                    return
+                date = re.sub(r"[^0-9-]", "", str(data.get("date", "")))[:10] or "video"
+                filename = f"Diary-AfterProduksi-{data['shift']}-{date}.mp4"
+                caption = str(body.get("caption") or "")[:900]
+                info = process_after_diary(data, target, caption, filename)
+                _reply(200, {"success": True, **info})
+            except Exception as e:
+                print(f"[AFTER-DIARY ERROR] {e}", flush=True)
+                _reply(500, {"success": False, "error": str(e)[:300]})
             return
 
         self.send_error(404, "Endpoint not found")
