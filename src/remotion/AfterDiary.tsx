@@ -21,10 +21,24 @@ export interface VideoDiaryData {
 export const FPS = 30;
 export const W = 720;
 export const H = 1280;
-export const INTRO_FRAMES = 75; // 2.5s
-export const PAGE_FRAMES = 90; // 3.0s per page (max 4 jobs/page)
-export const OUTRO_FRAMES = 75; // 2.5s
-export const JOBS_PER_PAGE = 4;
+// Alur: opening 10s + 2 slide pekerjaan @10s + ending 10s = 40 detik.
+export const INTRO_FRAMES = 300; // 10s
+export const PAGE_FRAMES = 300; // 10s per slide pekerjaan
+export const OUTRO_FRAMES = 300; // 10s
+
+/** Seluruh pekerjaan dibagi rata ke maksimal 2 slide (1 slide bila hanya ada 1 pekerjaan). */
+export function splitPages(tasks: DiaryTaskItem[]): DiaryTaskItem[][] {
+  if (tasks.length <= 1) return [tasks];
+  const per = Math.ceil(tasks.length / 2);
+  return [tasks.slice(0, per), tasks.slice(per)];
+}
+
+/** Gerak halus pelan agar slide 10 detik tidak terasa diam. */
+function Drift({ children }: { children: React.ReactNode }) {
+  const frame = useCurrentFrame();
+  const scale = interpolate(frame, [0, PAGE_FRAMES], [1, 1.03], { extrapolateRight: 'clamp' });
+  return <AbsoluteFill style={{ transform: `scale(${scale})` }}>{children}</AbsoluteFill>;
+}
 
 function getEmoji(name: string): string {
   const n = (name || '').toLowerCase();
@@ -170,6 +184,16 @@ function JobsPageScene({
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  // Makin banyak pekerjaan per slide, kartu dipadatkan agar semuanya muat.
+  const n = items.length;
+  const tiny = n > 9;
+  const dense = n > 6;
+  const cardGap = tiny ? 8 : dense ? 12 : 18;
+  const cardPad = tiny ? '9px 18px' : dense ? '13px 20px' : '20px 22px';
+  const innerGap = tiny ? 3 : dense ? 6 : 10;
+  const titleSize = tiny ? 19 : dense ? 21 : 24;
+  const nameSize = tiny ? 15 : dense ? 17 : 20;
+  const emojiSize = tiny ? 22 : dense ? 26 : 30;
 
   return (
     <AbsoluteFill
@@ -213,10 +237,10 @@ function JobsPageScene({
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: cardGap, flex: 1 }}>
         {items.map((item, idx) => {
           const sp = spring({
-            frame: Math.max(0, frame - idx * 6),
+            frame: Math.max(0, frame - idx * 8),
             fps,
             config: { damping: 15, stiffness: 130 },
           });
@@ -236,16 +260,16 @@ function JobsPageScene({
                 background: isOff ? 'rgba(127,29,29,0.32)' : 'rgba(15,23,42,0.88)',
                 border: `1.5px solid ${isOff ? 'rgba(248,113,113,0.45)' : isSisa ? 'rgba(251,191,36,0.45)' : 'rgba(56,189,248,0.3)'}`,
                 borderRadius: 22,
-                padding: '20px 22px',
+                padding: cardPad,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10,
+                gap: innerGap,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                  <span style={{ fontSize: 30 }}>{getEmoji(item.job || item.job_name)}</span>
-                  <span style={{ fontSize: 24, fontWeight: 800, color: isOff ? '#fca5a5' : '#e0f2fe' }}>
+                  <span style={{ fontSize: emojiSize }}>{getEmoji(item.job || item.job_name)}</span>
+                  <span style={{ fontSize: titleSize, fontWeight: 800, color: isOff ? '#fca5a5' : '#e0f2fe' }}>
                     {item.job_name}
                   </span>
                 </div>
@@ -263,7 +287,7 @@ function JobsPageScene({
                   {item.status}
                 </span>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: '#cbd5e1', lineHeight: 1.35 }}>
+              <div style={{ fontSize: nameSize, fontWeight: 600, color: '#cbd5e1', lineHeight: 1.3 }}>
                 👷 {names}
               </div>
             </div>
@@ -310,33 +334,27 @@ function OutroScene({ data }: { data: VideoDiaryData }) {
 }
 
 export function AfterProductionDiaryComposition({ data }: { data: VideoDiaryData }) {
-  const pages = useMemo(() => {
-    const chunks: DiaryTaskItem[][] = [];
-    for (let i = 0; i < data.tasks.length; i += JOBS_PER_PAGE) {
-      chunks.push(data.tasks.slice(i, i + JOBS_PER_PAGE));
-    }
-    return chunks.length > 0 ? chunks : [[]];
-  }, [data.tasks]);
+  const pages = useMemo(() => splitPages(data.tasks), [data.tasks]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#020617' }}>
       <Sequence from={0} durationInFrames={INTRO_FRAMES}>
-        <IntroScene data={data} />
+        <Drift><IntroScene data={data} /></Drift>
       </Sequence>
       {pages.map((items, idx) => (
         <Sequence key={idx} from={INTRO_FRAMES + idx * PAGE_FRAMES} durationInFrames={PAGE_FRAMES}>
-          <JobsPageScene data={data} items={items} pageIdx={idx} totalPages={pages.length} />
+          <Drift><JobsPageScene data={data} items={items} pageIdx={idx} totalPages={pages.length} /></Drift>
         </Sequence>
       ))}
       <Sequence from={INTRO_FRAMES + pages.length * PAGE_FRAMES} durationInFrames={OUTRO_FRAMES}>
-        <OutroScene data={data} />
+        <Drift><OutroScene data={data} /></Drift>
       </Sequence>
     </AbsoluteFill>
   );
 }
 
+
 export function diaryDurationInFrames(taskCount: number): number {
-  const pages = Math.max(1, Math.ceil(taskCount / JOBS_PER_PAGE));
+  const pages = taskCount <= 1 ? 1 : 2;
   return INTRO_FRAMES + pages * PAGE_FRAMES + OUTRO_FRAMES;
 }
-

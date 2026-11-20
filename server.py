@@ -222,7 +222,7 @@ def run_remotion_streaming(cmd, job_id, timeout=240):
 # After Produksi Video Diary (ubnetwork): render MP4 -> kirim ke WhatsApp
 # ---------------------------------------------------------------------------
 DIARY_API_KEY = os.environ.get("DIARY_API_KEY", "")
-BAILEY_WASEND_URL = os.environ.get("BAILEY_WASEND_URL", "http://34.16.81.31:3132/wasend")
+BAILEY_WASEND_URL = os.environ.get("BAILEY_WASEND_URL", "https://wa.bungtemin.net/wasend")
 MAX_DIARY_TASKS = 60
 
 
