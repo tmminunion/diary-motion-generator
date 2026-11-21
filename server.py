@@ -278,6 +278,30 @@ def process_after_diary(data, target, caption, filename):
         shutil.rmtree(work, ignore_errors=True)
 
 
+AFTER_DIARY_LOCK = threading.Lock()  # satu render sekaligus per instance (Chrome berat)
+
+
+def _wa_text(target, text):
+    import urllib.request
+    try:
+        req = urllib.request.Request(BAILEY_WASEND_URL,
+                                     data=json.dumps({"nomorTujuan": target, "pesan": text}).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        urllib.request.urlopen(req, timeout=30).read()
+    except Exception as e:
+        print(f"[AFTER-DIARY] gagal kirim teks WA: {e}", flush=True)
+
+
+def run_after_diary_job(data, target, caption, filename):
+    with AFTER_DIARY_LOCK:
+        try:
+            info = process_after_diary(data, target, caption, filename)
+            print(f"[AFTER-DIARY] terkirim ke {target}: {info}", flush=True)
+        except Exception as e:
+            print(f"[AFTER-DIARY ERROR] {e}", flush=True)
+            _wa_text(target, "⚠️ Video Diary After Produksi gagal dibuat. Silakan coba kirim ulang dari halaman After Produksi.")
+
+
 def process_olip_render_job(project, chat_id, job_id, bot_token=None):
     # Strictly ONE bot token (Olive Bot for Olip Video Studio)
     bot_token = bot_token or TELEGRAM_BOT_TOKEN
@@ -1077,8 +1101,9 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 date = re.sub(r"[^0-9-]", "", str(data.get("date", "")))[:10] or "video"
                 filename = f"Diary-AfterProduksi-{data['shift']}-{date}.mp4"
                 caption = str(body.get("caption") or "")[:900]
-                info = process_after_diary(data, target, caption, filename)
-                _reply(200, {"success": True, **info})
+                # Balas langsung; render + kirim WA berjalan di latar belakang (CPU always-on).
+                threading.Thread(target=run_after_diary_job, args=(data, target, caption, filename), daemon=True).start()
+                _reply(202, {"success": True, "queued": True, "message": "Video sedang dibuat dan akan dikirim ke WhatsApp."})
             except Exception as e:
                 print(f"[AFTER-DIARY ERROR] {e}", flush=True)
                 _reply(500, {"success": False, "error": str(e)[:300]})
